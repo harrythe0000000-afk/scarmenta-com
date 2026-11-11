@@ -1,0 +1,110 @@
+{
+  "project_name": "Aetheria Credit OS - Gaming Technology & Credit Platform",
+  "brand_identity": {
+    "location": "Cyprus HQ",
+    "target_markets": "South Asia & Middle East",
+    "tagline": "Next-Gen Institutional Gaming Credit Infrastructure & Financial Settlement",
+    "emotional_archetype": "ARCHETYPE 5: LUXURY & HIGH-TECH POWER (Obsidian & Electric Violet)",
+    "vibe": "High-density institutional fintech meets dark cyber luxury. Precision financial telemetry with glowing violet neon accents."
+  },
+  "color_system": {
+    "background": {
+      "void": "#05040A",
+      "canvas": "#0A0812",
+      "surface_dark": "#120E24",
+      "surface_card": "#181330",
+      "surface_card_hover": "#211A42"
+    },
+    "accents": {
+      "primary_purple": "#8B5CF6",
+      "bright_violet": "#A855F7",
+      "neon_magenta": "#D946EF",
+      "electric_glow": "rgba(139, 92, 246, 0.35)",
+      "real_money_emerald": "#10B981",
+      "promo_gold": "#F59E0B",
+      "alert_crimson": "#EF4444"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "muted": "#64748B",
+      "accent_purple": "#C084FC",
+      "accent_emerald": "#6EE7B7"
+    },
+    "borders": {
+      "subtle": "rgba(139, 92, 246, 0.15)",
+      "glowing": "rgba(168, 85, 247, 0.4)",
+      "real_money": "rgba(16, 185, 129, 0.3)"
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-sm sm:text-base text-slate-300 leading-relaxed",
+      "label": "text-xs font-semibold uppercase tracking-widest text-purple-400"
+    }
+  },
+  "key_features_and_flows": {
+    "marketing_landing_page": {
+      "hero_section": "Cinematic dark background with floating purple card graphics, live credit multiplier calculator, target market badges (Cyprus / South Asia / Middle East).",
+      "credit_packages_showcase": "5X promotional credit packages with explicit 20% tech service fee breakdown cards.",
+      "trust_badges_and_providers": "Licensed Cyprus entity status, SSL 256-bit encryption badges, provider logo cloud (Evolution, Pragmatic, Spribe, Playtech).",
+      "architecture_diagram": "Flow diagram showing User -> Deposit (INR/AED/USDT) -> 20% Tech Fee -> Real Money Wallet + 5X Promotional Credit Allocation."
+    },
+    "user_dashboard": {
+      "dual_wallet_banner": "Side-by-side high contrast balance cards: Real Money Wallet (Emerald border, 100% withdrawal eligible) vs Promotional Credit Wallet (Violet glow, 5X multiplier balance).",
+      "package_purchase_flow": "Interactive package selector with dynamic calculations (e.g. Deposit ₹20,000 -> Get ₹100,000 Promo Credits, ₹4,000 Tech Fee deduction breakdown).",
+      "mock_deposit_gateway": "Interactive modal supporting UPI/NetBanking, Credit Card, AED Wire, and USDT (TRC-20/ERC-20) with instant simulation.",
+      "transaction_history_table": "Searchable, filterable ledger with Status pill badges (Completed, Pending, Under Review).",
+      "account_statement_export": "Downloadable/printable statement preview with Cyprus regulatory reference.",
+      "support_system": "Ticket submission drawer and real-time live support mock chat."
+    },
+    "admin_dashboard": {
+      "cockpit_overview": "Real-time key metrics (Total Deposits, Total Promo Issued, Accumulated Tech Fees @ 20%, Pending Approvals, Active Users).",
+      "deposit_approval_queue": "Actionable queue with Approve/Reject triggers and fraud score indicators.",
+      "user_management_grid": "User profile inspector, wallet balance adjustment override, KYB/KYC verification state.",
+      "fee_configurator": "Interactive sliders for adjusting base tech service fees and tier multipliers.",
+      "fraud_alerts_feed": "High-priority alert list highlighting unusual 5X allocation velocity or multiple IP logins.",
+      "financial_reports": "Recharts visual telemetry comparing Real Money Deposits vs Promotional Allocations over time."
+    }
+  },
+  "surface_strategies": {
+    "crystal_glass": "backdrop-blur-xl bg-black/60 border border-purple-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
+    "tracing_beam_card": "relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-b from-purple-950/20 to-slate-950/80 p-6 hover:border-purple-500/60 transition-all duration-300",
+    "real_money_card": "relative rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/20 to-slate-950/90 p-6 shadow-lg shadow-emerald-950/30",
+    "promo_wallet_card": "relative rounded-2xl border border-purple-500/40 bg-gradient-to-b from-purple-900/30 via-slate-950 to-slate-950 p-6 shadow-xl shadow-purple-950/50"
+  },
+  "image_urls": {
+    "hero_background": "https://images.unsplash.com/photo-1689443111130-6e9c7dfd8f9e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBsdXh1cnklMjBnYW1pbmclMjBkYXJrJTIwcHVycGxlfGVufDB8fHx8MTc5NDQyMTE5OXww&ixlib=rb-4.1.0&q=85",
+    "neon_fintech_card": "https://images.unsplash.com/photo-1782858318635-61027a7631cb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxmaW50ZWNoJTIwbHV4dXJ5JTIwbmVvbiUyMHB1cnBsZSUyMGNhcmR8ZW58MHx8fHwxNzk0NDIxMTk5fDA&ixlib=rb-4.1.0&q=85",
+    "cyber_glow_mesh": "https://images.unsplash.com/photo-1576564081868-0fb07ce0b63c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxmaW50ZWNoJTIwbHV4dXJ5JTIwbmVvbiUyMHB1cnBsZSUyMGNhcmR8ZW58MHx8fHwxNzk0NDIxMTk5fDA&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_and_accessibility": {
+    "mandatory_rule": "Every button, tab, input, table row, card, and modal action MUST have a data-testid attribute formatted in kebab-case.",
+    "examples": [
+      "data-testid=\"landing-hero-cta-button\"",
+      "data-testid=\"nav-user-dashboard-link\"",
+      "data-testid=\"nav-admin-dashboard-link\"",
+      "data-testid=\"real-wallet-balance-card\"",
+      "data-testid=\"promo-credit-balance-card\"",
+      "data-testid=\"credit-multiplier-calculator-input\"",
+      "data-testid=\"deposit-modal-open-button\"",
+      "data-testid=\"admin-approve-deposit-btn-1\"",
+      "data-testid=\"fee-config-slider\""
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure the entire app operates seamlessly in Luxury Dark mode with smooth state persistence.",
+    "Implement clear role/view switcher at the top navigation bar so reviewers can instantly jump between 'Marketing Landing Page', 'User Dashboard', and 'Admin Dashboard'.",
+    "Make sure the 5X credit multiplier logic (e.g. ₹20,000 deposit yields ₹100,000 promotional credits with a 20% tech service fee breakdown) is visually prominent and interactive.",
+    "All forms and interactive modals (Deposit Gateway, Support Ticket, Config Sliders) should feature interactive state updates and Sonner toast feedback.",
+    "Include high-density data visualizations using Recharts in the Admin Dashboard for financial reporting.",
+    "Do NOT use transparent headers; use glassmorphism with backdrop blur and border dividers."
+  ]
+}
