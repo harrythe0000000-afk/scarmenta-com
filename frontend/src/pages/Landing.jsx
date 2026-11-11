@@ -163,6 +163,7 @@ const Trust = () => (
         <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">Infrastructure, not influence.</h2>
         <p className="mt-4 text-slate-400">
           Aetheria provides credit and accounting technology only. We never alter or influence third-party game outcomes.
+          Prepaid credits are for platform use only and cannot be withdrawn or refunded.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -190,7 +191,7 @@ export default function Landing() {
       <footer className="border-t border-purple-500/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-10 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <BrandLogo testId="footer-logo-link" />
-          <p className="max-w-xl">18+ only. Play responsibly. Services are available only where legally authorized. © {new Date().getFullYear()} Aetheria Credit Ltd, Limassol, Cyprus.</p>
+          <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} Aetheria Credit Ltd, Limassol, Cyprus.</p>
         </div>
       </footer>
     </div>

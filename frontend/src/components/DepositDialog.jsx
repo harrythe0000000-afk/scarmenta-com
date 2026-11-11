@@ -82,7 +82,7 @@ export const DepositDialog = ({ open, onOpenChange, config, presetAmount, onDone
         </div>
         {config && (
           <p className="text-[11px] text-slate-500">
-            Limits: {inr(config.min_deposit)} – {inr(config.max_deposit)} per deposit.
+            Limits: {inr(config.min_deposit)} – {inr(config.max_deposit)} per deposit. Prepaid credits are non-refundable and cannot be withdrawn.
           </p>
         )}
         <Button

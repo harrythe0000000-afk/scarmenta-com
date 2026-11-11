@@ -21,7 +21,7 @@ const WalletCard = ({ kind, value, testId }) => {
         {real ? <Wallet className="h-5 w-5 text-emerald-300" /> : <Sparkles className="h-5 w-5 text-fuchsia-300" />}
       </div>
       <p className="relative mt-6 font-num text-4xl font-semibold tracking-tight text-white sm:text-5xl" data-testid={`${testId}-value`}>{inr(value)}</p>
-      <p className="relative mt-2 text-xs text-slate-500">{real ? "Net of technology service fees" : "Allocated at the published promo multiplier"}</p>
+      <p className="relative mt-2 text-xs text-slate-500">{real ? "Net of technology service fees · Non-withdrawable" : "Allocated at the published promo multiplier · Non-withdrawable"}</p>
     </div>
   );
 };

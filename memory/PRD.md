@@ -21,6 +21,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Seed: admin + verified demo player (see test_credentials.md)
 
 ## Backlog
-- P1: Gaming provider integration layer (Evolution/Ezugi/Pragmatic) when contracts exist; real payment gateway; withdrawals flow with approval
+- P1: Gaming provider integration layer (Evolution/Ezugi/Pragmatic) when contracts exist; real payment gateway
+- RULE (user, Nov 2026): NO withdrawals — prepaid credits are non-withdrawable/non-refundable (disclosed on landing, wallets, deposit dialog)
 - P1: KYC document upload + review; 2FA
 - P2: Multi-currency (AED/USDT) wallets; scheduled monthly statements by email; refresh-token rotation/revocation; Mongo transactions for ledger atomicity; shadcn date picker
