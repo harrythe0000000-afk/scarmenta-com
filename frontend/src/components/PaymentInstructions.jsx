@@ -50,7 +50,8 @@ export const PaymentInstructions = ({ config, method, network, setNetwork, amoun
               <p className="text-[11px] text-slate-500" data-testid="deposit-fx-rate">Today's rate: $1 = ₹{rate}. Set by the platform and may change.</p>
             </>
           )}
-          <Input data-testid="deposit-reference-input" value={reference} onChange={(e) => setReference(e.target.value)}
+          <label htmlFor="deposit-reference" className="label-eyebrow block pt-1">{method === "usdt" ? "Transaction hash (TX ID)" : "UPI UTR / reference number"}</label>
+          <Input id="deposit-reference" data-testid="deposit-reference-input" value={reference} onChange={(e) => setReference(e.target.value)}
             placeholder={method === "usdt" ? "Paste the transaction hash (TX ID)" : "Enter the 12-digit UPI UTR number"}
             className="h-11 border-purple-500/25 bg-black/40 font-num" />
         </>

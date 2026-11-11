@@ -19,6 +19,7 @@ from typing import Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel, ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from starlette.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -138,11 +139,11 @@ class SettingsIn(BaseModel):
     referral_bonus_percent: float = Field(ge=0, le=100)
     loss_reward_percent: float = Field(ge=0, le=100)
     packages: List[float] = Field(min_length=1, max_length=8)
-    fx_rates: Dict[str, float] = Field(default_factory=dict)
-    upi_id: str = Field(default="", max_length=100)
-    usdt_trc20: str = Field(default="", max_length=120)
-    usdt_erc20: str = Field(default="", max_length=120)
-    usdt_bep20: str = Field(default="", max_length=120)
+    fx_rates: Dict[str, float]
+    upi_id: str = Field(max_length=100)
+    usdt_trc20: str = Field(max_length=120)
+    usdt_erc20: str = Field(max_length=120)
+    usdt_bep20: str = Field(max_length=120)
 
 
 # ---------- Helpers ----------
@@ -349,7 +350,9 @@ async def create_deposit(body: DepositIn, user: dict = Depends(get_current_user)
         local = {"network": None, "pay_to": s["upi_id"], "local_currency": "INR", "fx_rate": rate,
                  "local_amount": round(body.amount * rate, 2)}
     ref = body.payment_reference.strip()
-    if await db.deposits.find_one({"payment_reference": ref, "status": {"$ne": "rejected"}}):
+    try:
+        await db.payment_refs.insert_one({"_id": ref.upper(), "user_id": user["id"], "created_at": now_iso()})
+    except DuplicateKeyError:
         raise HTTPException(status_code=400, detail="This payment reference has already been submitted")
     since = (now() - timedelta(hours=24)).isoformat()
     recent = await db.deposits.count_documents({"user_id": user["id"], "created_at": {"$gte": since}})
@@ -526,6 +529,8 @@ async def admin_reject(dep_id: str, body: RejectIn, admin: dict = Depends(requir
         projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not dep:
         raise HTTPException(status_code=409, detail="Deposit not found or already reviewed")
+    if dep.get("payment_reference"):
+        await db.payment_refs.delete_one({"_id": dep["payment_reference"].upper()})
     return dep
 
 

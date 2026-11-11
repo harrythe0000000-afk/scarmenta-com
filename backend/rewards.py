@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from core import db, get_current_user, get_settings, make_tx, new_id, now, now_iso, require_admin
 
@@ -72,6 +73,19 @@ async def run(body: RunIn, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="The period must end in the past and after it starts")
     if await db.loss_reward_runs.find_one({"period_start": {"$lt": end}, "period_end": {"$gt": start}}):
         raise HTTPException(status_code=400, detail="This period overlaps a previous payout")
+    try:
+        await db.locks.insert_one({"_id": "loss_reward_run", "at": now_iso()})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="A payout is already in progress")
+    try:
+        return await _pay(start, end, admin)
+    finally:
+        await db.locks.delete_one({"_id": "loss_reward_run"})
+
+
+async def _pay(start: str, end: str, admin: dict) -> dict:
+    if await db.loss_reward_runs.find_one({"period_start": {"$lt": end}, "period_end": {"$gt": start}}):
+        raise HTTPException(status_code=400, detail="This period overlaps a previous payout")
     p = await _preview(start, end)
     if p["percent"] <= 0:
         raise HTTPException(status_code=400, detail="Loss reward % is 0 — set it in Credit Config first")
@@ -79,9 +93,13 @@ async def run(body: RunIn, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="No player had a net loss in this period")
     run_doc = {"id": new_id(), "period_start": start, "period_end": end, "percent": p["percent"],
                "players": len(p["rows"]), "total_reward": p["total_reward"], "paid_by": admin["email"],
-               "created_at": now_iso()}
+               "status": "processing", "paid_user_ids": [], "created_at": now_iso()}
     await db.loss_reward_runs.insert_one(dict(run_doc))
     for r in p["rows"]:
+        claimed = await db.loss_reward_runs.update_one({"id": run_doc["id"], "paid_user_ids": {"$ne": r["user_id"]}},
+                                                       {"$push": {"paid_user_ids": r["user_id"]}})
+        if not claimed.modified_count:
+            continue
         user = await db.users.find_one_and_update(
             {"id": r["user_id"]}, {"$inc": {"promo_balance": r["reward"], "loss_rewards_total": r["reward"]}},
             projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
@@ -89,12 +107,14 @@ async def run(body: RunIn, admin: dict = Depends(require_admin)):
             user, "loss_reward", "credit", r["reward"],
             f"Weekly loss reward: {p['percent']:g}% of ${r['net_loss']:,.2f} net loss ({start[:10]} → {end[:10]})",
             f"LR-{run_doc['id'][:8].upper()}", user["promo_balance"]))
-    return run_doc
+    await db.loss_reward_runs.update_one({"id": run_doc["id"]}, {"$set": {"status": "done"}})
+    run_doc.pop("paid_user_ids", None)
+    return {**run_doc, "status": "done"}
 
 
 @router.get("/admin/loss-rewards/runs")
 async def runs(_: dict = Depends(require_admin)):
-    return await db.loss_reward_runs.find({}, {"_id": 0}).sort("period_end", -1).to_list(200)
+    return await db.loss_reward_runs.find({}, {"_id": 0, "paid_user_ids": 0}).sort("period_end", -1).to_list(200)
 
 
 @router.get("/rewards/loss/me")

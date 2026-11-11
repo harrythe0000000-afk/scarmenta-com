@@ -32,8 +32,8 @@ const ProviderCard = ({ p }) => {
       </div>
       <h3 className="mt-5 font-display text-lg font-semibold text-white">{p.name}</h3>
       <p className="mt-1 flex-1 text-sm text-slate-400">{p.description || "Authorized gaming provider"}</p>
-      <Button data-testid={`game-play-btn-${p.code}`} disabled={busy} onClick={play} className="mt-5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500">
-        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} Play
+      <Button data-testid={`game-play-btn-${p.code}`} disabled={busy || !p.connected} onClick={play} className="mt-5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500">
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />} {p.connected ? "Play" : "Coming soon"}
       </Button>
     </div>
   );

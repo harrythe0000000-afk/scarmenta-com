@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 4: full USD-model test. Rewrote /app/backend/tests/test_platform_api.py for USD (21 tests, all pass): public config USD, auth/cookies/bcrypt/CORS/lockout/logout, roles, USDT+UPI deposits (fx 95 -> local_amount), duplicate ref/missing network/unconfigured network/short ref/limits, reject + rejected-ref reuse, fraud high_amount ($2,000) + velocity, FX settings (INR 90 applied to new UPI deposits, EUR added, invalid code/rate<=0 -> 400, INR removed -> UPI 400, restore), referral 10% on every deposit ($100+$50 -> $15, two referral_bonus entries, referral_earnings=15), loss rewards (bet 100/win 20 -> net 80, est $4, preview, run pays $4 ledger loss_reward, overlap -> 400, next preview starts at last end, future end -> 400), money flow totals, seeded providers in lobby, launch currency=USD, rotate key, wallet flow (402 retry, NO_BET_FOR_ROUND after rollback). Demo flow done once (one-off script): TEST referee registered with demo code AE843071 -> demo got $10+$5. UI (Playwright 1920x1080): landing $200 -> $1,000.00 and packages $50..$1,000 at 5X with no ₹; deposit dialog USDT TRC20 instructions, ERC20/BEP20 show payment-unavailable with submit disabled, ref <6 chars disables submit, UPI tab shows 'Pay ₹9,500 by UPI' + fx rate, submit works with toast; admin Deposits shows method/network, payment ref, Received (₹9,500 @ ₹95/$ or 250 USDT), USD amount, credits, and approve/reject work; Credit Config FX edit INR 90 + add EUR saved (UPI/TRC20 untouched), EUR 0 -> error toast, restored INR 95 / EUR removed; Loss Rewards preview lists demo $80 -> $4, confirm dialog, toast, run listed, button disabled afterwards; Users has Referral income + Loss rewards columns ($15/$4); Referrals page shows EARNING $15; Money Flow shows all live totals (verified against DB math) + admin access card; player Refer page shows earning; Rewards page shows $4 total + history; Games lobby shows Evolution/Ezugi/Pragmatic as Coming soon; Statement CSV exports USD columns; provider rotate-key confirm (dismiss = no rotate, accept = new key dialog); fraud list; logout + protected-route redirect. No ₹ found in player/admin money UI except the UPI INR amounts. No page errors, no backend 500s.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/admin/settings", "issue": "SettingsIn gives fx_rates/upi_id/usdt_* defaults ({} / ''). A body that leaves these out silently wipes all FX rates and payment addresses, which turns off UPI and USDT deposits. The UI sends the full object, so only API clients are affected. Make these fields required or merge them with the stored values."},
+      {"endpoint": "POST /api/admin/loss-rewards/run", "issue": "The overlap check and the insert are not atomic. Two Pay clicks or requests at the same moment can both pass and pay the same period twice. The run doc is also inserted before the credit loop, so a failure mid-loop leaves a partial payout that can't be retried. Use a lock or unique guard (e.g. a conditional upsert on a 'loss_reward_lock' doc), or insert the run with status=processing and mark it done after the loop."},
+      {"endpoint": "POST /api/deposits", "issue": "The duplicate payment_reference check is a find-then-insert with no unique index, so two concurrent submits with the same UTR/TX hash both succeed. It is also case-sensitive ('abc123' and 'ABC123' are treated as different references)."},
+      {"endpoint": "POST /api/auth/register", "issue": "The email provider hit its rate limit (429) during test registrations. This was handled gracefully (verification_sent=false), but users won't get a verification email while the limit lasts."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Games lobby", "issue": "'Coming soon' providers still have an enabled Play button. Each click creates a new game session and shows a 'being connected' toast. Consider disabling it or labelling it 'Notify me' when connected=false.", "selector": "[data-testid^='game-play-btn-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Deposit dialog", "issues": ["The payment reference input relies on its placeholder. Once the user types, there is no visible label saying what the field is (UTR / TX hash). Add a label."]},
+      {"screen": "Admin Credit Config", "issues": ["fx-row/fx-rate/fx-code data-testids are derived from the code being typed, so the testid changes on every keystroke. Use the index or a stable id."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_results.xml", "/app/backend/tests/manual_demo_flow.py", "/app/backend/tests/manual_pending_deposit.py"],
+  "action_items": [
+    "Make SettingsIn payment/fx fields required, or merge partial updates with stored settings",
+    "Make the loss-reward payout atomic / idempotent (lock or unique guard; processing->done status)",
+    "Add a unique (case-normalised) index or atomic guard for active payment_reference",
+    "Optional UX: disable or relabel Play for providers that are not connected; add a label to the deposit reference input"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 654 lines, close to the 700-line limit. Consider moving the admin routes into their own module.",
+    "Referral income is also paid to suspended referrers. Decide whether that is intended.",
+    "Velocity counts the seeded demo deposits too (the demo gets a velocity flag on its first real deposit after reseed). This is expected behaviour, noted for context."
+  ],
+  "updated_files": ["/app/backend/tests/test_platform_api.py", "/app/backend/tests/manual_demo_flow.py", "/app/backend/tests/manual_pending_deposit.py"],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% of requested flows"},
+  "test_credentials": "admin@aetheria.io / Admin@12345, demo@aetheria.io / Demo@12345 (from /app/memory/test_credentials.md; that file still mentions old INR seed amounts and should be updated to $200 approved + $500 pending)",
+  "seed_data_creation": "Kept on purpose so the referral UI has data: TEST referee test_ref_305927@example.com (id 5b09c83e-...) referred by demo, with 2 approved USDT deposits ($100, $50). Demo changes made as requested: +$15 referral income, a $100 bet / $20 win on Ezugi (Ezugi key rotated twice, launch_url still null), +$4 loss reward (two loss_reward_runs exist: one from pytest for a TEST user, one paid to demo through the UI), one rejected UPI deposit DEP-609F03A8 (TESTUI ref) and its open velocity alert. Demo balance is now $939. Settings restored exactly (INR 95, placeholder UPI/TRC20, 10%/5%). Pytest TEST users/providers were cleaned up by id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_platform_api.py is now on the USD model. Settings-, deposit-, referral- and loss-reward tests share the TestDeposits class so they don't race under xdist loadscope. Loss-reward runs are global: the preview starts at the last run's period_end, and each pytest run pays a new tiny period (only users with net loss in it). The ref() helper generates unique payment references. Deposit dialog defaults to USDT TRC20. The login submit is '[data-testid=login-form] button[type=submit]'. Loss-reward Pay and provider rotate use window.confirm, so accept the dialog in Playwright."
+}

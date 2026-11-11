@@ -25,3 +25,14 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - RULE (user, Nov 2026): NO withdrawals — prepaid credits are non-withdrawable/non-refundable (disclosed on landing, wallets, deposit dialog)
 - P1: KYC document upload + review; 2FA
 - P2: Multi-currency (AED/USDT) wallets; scheduled monthly statements by email; refresh-token rotation/revocation; Mongo transactions for ledger atomicity; shadcn date picker
+
+## Update (Nov 2026) — USD + rewards + game wallet API
+- Currency: everything in USD. Deposits: USDT (TRC20/ERC20/BEP20, all countries) or UPI (INR at admin-set rate, default $1=₹95). User submits UTR/TX hash; admin verifies & approves. Payment refs unique (case-insensitive).
+- 5X credit into one main balance; no fees; NO withdrawals.
+- Refer & earn: 10% (configurable) of EVERY approved deposit by referred friend → referrer main balance; tracked as referral_earnings (separate column/cards).
+- Weekly loss rewards: admin pays % (default 5) of net loss (bets − refunds − wins) per period; non-overlapping periods, locked payout.
+- Game providers: Evolution / Ezugi / Pragmatic seeded as slots (no launch URL yet). Seamless wallet API /api/provider/v1/{balance,bet,win,rollback} with X-Provider-Key; idempotent.
+- Admin: Money Flow page, Loss Rewards, Referrals, Game Providers, Game Activity, Credit Config (multiplier, packages, fx rates, UPI/USDT addresses, referral %, loss %).
+## Backlog
+- P1: Real provider contracts → set launch URLs + hand over keys; change-password / multiple admin accounts; per-game catalog
+- P2: Auto-verify USDT via blockchain explorer; scheduled weekly loss-reward run; shadcn date picker

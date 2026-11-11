@@ -47,11 +47,11 @@ const FxRatesCard = ({ rates, setRates }) => {
       <p className="text-xs text-slate-500">INR is used for UPI deposits: e.g. 95 means a player pays ₹95 for every $1. Update these whenever the market rate changes.</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {rates.map((r, i) => (
-          <div key={i} className="flex items-center gap-2 rounded-xl border border-white/5 bg-black/30 p-2" data-testid={`fx-row-${r.code || i}`}>
+          <div key={i} className="flex items-center gap-2 rounded-xl border border-white/5 bg-black/30 p-2" data-testid={`fx-row-${i}`}>
             <span className="pl-1 font-num text-xs text-slate-500">$1 =</span>
-            <Input data-testid={`fx-rate-${r.code || i}`} type="number" value={r.rate} onChange={(e) => upd(i, "rate", e.target.value)} className="h-9 border-purple-500/20 bg-black/40 font-num" />
-            <Input data-testid={`fx-code-${r.code || i}`} value={r.code} onChange={(e) => upd(i, "code", e.target.value.toUpperCase())} className="h-9 w-20 border-purple-500/20 bg-black/40 font-num" />
-            <button type="button" data-testid={`fx-remove-${r.code || i}`} onClick={() => setRates(rates.filter((_, j) => j !== i))} className="rounded-md p-1 text-slate-500 hover:text-red-300"><X className="h-4 w-4" /></button>
+            <Input data-testid={`fx-rate-${i}`} type="number" value={r.rate} onChange={(e) => upd(i, "rate", e.target.value)} className="h-9 border-purple-500/20 bg-black/40 font-num" />
+            <Input data-testid={`fx-code-${i}`} value={r.code} onChange={(e) => upd(i, "code", e.target.value.toUpperCase())} className="h-9 w-20 border-purple-500/20 bg-black/40 font-num" />
+            <button type="button" data-testid={`fx-remove-${i}`} onClick={() => setRates(rates.filter((_, j) => j !== i))} className="rounded-md p-1 text-slate-500 hover:text-red-300"><X className="h-4 w-4" /></button>
           </div>
         ))}
       </div>
