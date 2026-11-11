@@ -81,7 +81,7 @@ const Hero = ({ config }) => {
             ))}
           </div>
         </div>
-        <div className="fade-up d-2 card-lux glow-violet p-6 sm:p-8" data-testid="landing-calculator-card">
+        <div className="fade-up d-2 card-lux glow-violet self-center p-6 sm:p-8" data-testid="landing-calculator-card">
           <p className="label-eyebrow">Live credit calculator</p>
           <h2 className="mt-2 font-display text-xl font-semibold text-white">See your credit balance instantly</h2>
           <div className="mt-6">

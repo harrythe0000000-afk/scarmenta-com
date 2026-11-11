@@ -45,7 +45,7 @@ export default function AdminOverview() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="card-lux p-6" data-testid="admin-chart-fees">
+        <div className="card-lux p-6" data-testid="admin-chart-daily-deposits">
           <p className="label-eyebrow">Revenue</p>
           <h3 className="mt-1 font-display text-lg font-semibold text-white">Daily cash deposits</h3>
           <div className="mt-6 h-72">

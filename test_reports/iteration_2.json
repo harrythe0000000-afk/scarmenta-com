@@ -1,0 +1,42 @@
+{
+  "summary": "Tested the new model end to end: one 5X credit balance, no service fee, no withdrawals. Backend: rewrote /app/backend/tests/test_platform_api.py for the new model. All 23 tests pass. Coverage: auth (cookies, bcrypt, CORS, refresh, lockout 429 on the 5th failure), roles, email-verification gate, deposits approved at 5X with exactly one 'deposit'/'credit' ledger entry and no service_fee entries, reject, fraud alerts, adjust without a wallet field (an over-debit is rejected), stats, settings without fee_percent (4X then back to 5X; package outside min/max returns 400), no withdraw endpoints, support (admin replies do not reopen tickets). Frontend (Playwright, 1920x1080): landing calculator ₹20,000 -> ₹1,00,000, packages show Credit balance plus Service fee ₹0, no real wallet or fee rows. Demo /app shows ₹1,00,000 / ₹20,000 / ₹1,00,000 / pending 1. Deposit dialog shows 5X and submits a pending deposit. Deposits table columns read Cash paid / Credits. Admin cockpit stats and both charts render. Admin approve in the UI gave 60,000 credits for a ₹12,000 deposit, as one ledger entry. Settings has one multiplier slider and the 4X save/restore works. The adjust dialog has no wallet selector, rejects an over-debit with a toast, and a +500 adjustment applies. Statement has type and date filters, totals and CSV export, and no wallet filter. Support ticket creation works. No functional bugs found; only minor naming and UX leftovers.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/register, seed()", "issue": "New users are still created with a 'real_balance': 0.0 field, left over from the old model. It is not exposed in the wallet API but is dead data."},
+      {"endpoint": "GET /api/transactions, /api/admin/transactions", "issue": "Still accept a 'wallet' query param (tx_query). Harmless, but dead now that there is only the 'credit' wallet."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "User Overview CreditBalanceCard", "issue": "The '5X of every cash deposit' subtitle is hardcoded. It stays at 5X when the admin changes the multiplier (e.g. to 4X). Use config.promo_multiplier.", "selector": "[data-testid='credit-balance-card']", "priority": "LOW"},
+      {"component": "User Overview balance/stat cards", "issue": "inr(undefined) shows ₹0 while /wallet is loading, so users briefly see a ₹0 balance. Show a skeleton instead.", "selector": "[data-testid='credit-balance-card-value']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin sidebar / Fraud page", "issues": ["The nav item is still labelled 'Fee Config' (App.js line 36), and the Fraud page says 'Thresholds are set in Fee Config', but there is no fee anymore. Rename to e.g. 'Credit Config'. The chart testid 'admin-chart-fees' is also stale."]},
+      {"screen": "Landing calculator card", "issues": ["Large empty space below the calculator in the hero card (about 150px) where the removed fee/real wallet rows used to be."]},
+      {"screen": "Statement filters", "issues": ["Uses the browser's native date input (type=date) instead of a shadcn Calendar/Popover date picker."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Rename the 'Fee Config' nav label and its text on the Fraud page (no fee exists now)",
+    "Make the CreditBalanceCard subtitle use config.promo_multiplier instead of a hardcoded 5X",
+    "Optional: remove the leftover real_balance field from register/seed and the wallet query param from tx_query",
+    "Optional: tighten the landing calculator card height; show loading skeletons instead of ₹0"
+  ],
+  "critical_code_review_comments": [
+    "Approve flow is atomic on status (find_one_and_update pending->approved), so double approval returns 409. Credit uses $inc. Good.",
+    "The adjust endpoint's negative-balance guard uses a filter on promo_balance with $gte, so it is race-safe. Good.",
+    "Admin approve updates the deposit and then inserts the ledger entry in a separate step with no transaction. If the insert fails, the balance changes without a ledger entry. Acceptable for MVP.",
+    "The frontend Settings page strips fee_percent before the PUT, and the backend SettingsIn has no fee field. Consistent."
+  ],
+  "updated_files": ["/app/backend/tests/test_platform_api.py"],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "100% of requested flows (minor cosmetic issues only)"},
+  "seed_data_creation": "None kept. Created throwaway TEST_ users (deleted by id along with their deposits, transactions, tickets and tokens). The UI test made one ₹3,000 deposit on the demo account (DEP-5F15792D). It raised a velocity fraud alert; both the deposit and the alert were deleted by reference. Demo is back to balance ₹1,00,000, 2 deposits, 1 pending. Multiplier restored to 5X.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_platform_api.py now asserts the single credit model. The settings test lives inside TestDeposits so that xdist loadscope does not race the multiplier against other deposit tests. Any deposit made on the demo account in the UI creates a velocity alert (demo already has 2 deposits in 24h), so clean it up by reference.",
+  "rca of the issue": ""
+}

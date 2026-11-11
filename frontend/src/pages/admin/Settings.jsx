@@ -48,7 +48,7 @@ export default function AdminSettings() {
       const packages = pkgText.split(",").map((x) => Number(x.trim())).filter((x) => x > 0);
       const { fee_percent, ...rest } = s;
       const body = { ...rest, packages, min_deposit: Number(s.min_deposit), max_deposit: Number(s.max_deposit),
-        fraud_amount_threshold: Number(s.fraud_amount_threshold), fraud_velocity_count: Number(s.fraud_velocity_count) };
+        fraud_amount_threshold: Number(s.fraud_amount_threshold), fraud_velocity_count: Number(s.fraud_velocity_count), referral_bonus_percent: Number(s.referral_bonus_percent) };
       const { data: saved } = await api.put("/admin/settings", body);
       setS(saved);
       setPkgText(saved.packages.join(", "));
@@ -89,6 +89,11 @@ export default function AdminSettings() {
           <p className="label-eyebrow">Fraud rules</p>
           <NumField label="Flag deposits at or above (₹)" value={s.fraud_amount_threshold} onChange={set("fraud_amount_threshold")} testId="settings-fraud-threshold" />
           <NumField label="Flag when deposits in 24h reach" value={s.fraud_velocity_count} onChange={set("fraud_velocity_count")} testId="settings-fraud-velocity" />
+        </div>
+        <div className="card-lux space-y-4 p-6">
+          <p className="label-eyebrow">Refer & earn</p>
+          <NumField label="Referrer bonus (% of friend's first deposit, as credits)" value={s.referral_bonus_percent} onChange={set("referral_bonus_percent")} testId="settings-referral-bonus" />
+          <p className="text-xs text-slate-500">Set to 0 to switch referral rewards off.</p>
         </div>
       </div>
     </>

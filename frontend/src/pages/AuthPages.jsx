@@ -92,7 +92,8 @@ export const Login = () => {
 export const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "", country: "" });
+  const [params] = useSearchParams();
+  const [form, setForm] = useState({ name: "", email: "", password: "", country: "", referral_code: params.get("ref") || "" });
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -102,7 +103,7 @@ export const Register = () => {
     setBusy(true);
     setError("");
     try {
-      const u = await register({ ...form, country: form.country || null });
+      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null });
       toast.success(u.verification_sent ? "Account created — check your inbox to verify your email." : "Account created. Use 'Resend email' to get your verification link.");
       navigate("/app");
     } catch (err) {
@@ -120,6 +121,7 @@ export const Register = () => {
         <Field id="email" label="Email" type="email" required value={form.email} data-testid="register-email-input" onChange={set("email")} />
         <Field id="password" label="Password (min 8 chars)" type="password" minLength={8} required value={form.password} data-testid="register-password-input" onChange={set("password")} />
         <Field id="country" label="Country (optional)" value={form.country} data-testid="register-country-input" onChange={set("country")} />
+        <Field id="referral" label="Referral code (optional)" value={form.referral_code} data-testid="register-referral-input" onChange={set("referral_code")} />
         <label className="flex items-start gap-3 text-xs text-slate-400">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} data-testid="register-agree-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500" />
           I confirm I am 18+ and located in a jurisdiction where these services are legally authorized.

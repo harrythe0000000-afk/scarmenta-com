@@ -9,15 +9,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useConfig, useFetch } from "@/lib/hooks";
 import { calc, inr } from "@/lib/format";
 
-const CreditBalanceCard = ({ value, testId }) => (
+const CreditBalanceCard = ({ value, mult, testId }) => (
   <div data-testid={testId} className="relative overflow-hidden rounded-2xl border border-purple-500/40 bg-gradient-to-b from-purple-900/30 to-[#05040A] p-8 glow-violet fade-up">
     <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl" />
     <div className="relative flex items-center justify-between">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-300">Credit balance</p>
       <Sparkles className="h-5 w-5 text-fuchsia-300" />
     </div>
-    <p className="relative mt-6 font-num text-5xl font-semibold tracking-tight text-white sm:text-6xl" data-testid={`${testId}-value`}>{inr(value)}</p>
-    <p className="relative mt-2 text-xs text-slate-500">5X of every cash deposit · No service fees · Non-withdrawable</p>
+    <p className="relative mt-6 font-num text-5xl font-semibold tracking-tight text-white sm:text-6xl" data-testid={`${testId}-value`}>{value == null ? "—" : inr(value)}</p>
+    <p className="relative mt-2 text-xs text-slate-500">{mult ?? 5}X of every cash deposit · No service fees · Non-withdrawable</p>
   </div>
 );
 
@@ -35,7 +35,7 @@ export default function UserOverview() {
       <PageHeader eyebrow="Player account" title={`Hello, ${user?.name?.split(" ")[0] || ""}`} desc="Your balances, credit packages and latest ledger activity."
         action={<Button data-testid="deposit-modal-open-button" onClick={() => buy(null)} className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 hover:from-violet-500 hover:to-fuchsia-500"><Plus className="mr-2 h-4 w-4" /> New deposit</Button>} />
 
-      <CreditBalanceCard value={w?.balance} testId="credit-balance-card" />
+      <CreditBalanceCard value={w?.balance} mult={config?.promo_multiplier} testId="credit-balance-card" />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <StatCard label="Cash deposited" value={inr(w?.total_deposited)} icon={TrendingUp} testId="stat-total-deposited" />

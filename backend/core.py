@@ -24,6 +24,7 @@ DEFAULT_SETTINGS = {
     "max_deposit": 500000.0,
     "fraud_amount_threshold": 100000.0,
     "fraud_velocity_count": 3,
+    "referral_bonus_percent": 10.0,
     "packages": [5000.0, 10000.0, 20000.0, 50000.0, 100000.0],
 }
 
@@ -133,3 +134,17 @@ def client_ip(request: Request) -> str:
     if fwd:
         return fwd.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
+
+
+def make_tx(user: dict, kind: str, wallet: str, amount: float, description: str, reference: str, balance_after: float) -> dict:
+    return {"id": new_id(), "user_id": user["id"], "user_email": user["email"], "user_name": user.get("name", ""),
+            "type": kind, "wallet": wallet, "amount": round(amount, 2), "description": description,
+            "reference": reference, "balance_after": round(balance_after, 2), "created_at": now_iso()}
+
+
+async def unique_referral_code() -> str:
+    import secrets
+    while True:
+        code = "AE" + secrets.token_hex(3).upper()
+        if not await db.users.find_one({"referral_code": code}):
+            return code

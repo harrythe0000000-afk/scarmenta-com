@@ -1,4 +1,4 @@
-# Aetheria credit platform - backend regression tests (auth, wallet, deposits, admin, fraud, support, settings)
+# Aetheria credit platform - backend regression tests (single 5X credit balance, no fee, no withdrawals; auth, deposits, admin, fraud, support, settings)
 import os
 import uuid
 import pytest
@@ -59,7 +59,8 @@ class TestAuth:
         r = requests.get(f"{API}/public/config")
         assert r.status_code == 200
         d = r.json()
-        assert d["fee_percent"] == 20 and d["promo_multiplier"] == 5
+        assert "fee_percent" not in d and d["promo_multiplier"] == 5
+        assert all(d["min_deposit"] <= p <= d["max_deposit"] for p in d["packages"])
 
     def test_login_cookies_and_me(self):
         s, r = login(*DEMO)
@@ -109,8 +110,8 @@ class TestAuth:
     def test_lockout(self, admin):
         email = f"test_lock_{uuid.uuid4().hex[:6]}@example.com"
         codes = [requests.post(f"{API}/auth/login", json={"email": email, "password": "x"}).status_code for _ in range(6)]
-        assert codes[:5] == [401] * 5, codes
-        assert codes[5] == 429, codes
+        assert codes[:4] == [401] * 4, codes
+        assert codes[4] == 429 and codes[5] == 429, codes
         alerts = admin.get(f"{API}/admin/fraud", params={"status": "open"}).json()
         a = [x for x in alerts if x["kind"] == "login_lockout" and email in x["message"]]
         assert a
@@ -138,7 +139,8 @@ class TestDeposits:
     def test_demo_wallet(self):
         s, _ = login(*DEMO)
         w = s.get(f"{API}/wallet").json()
-        assert w["real_balance"] >= 16000 and w["promo_balance"] >= 100000
+        assert set(w) == {"balance", "total_deposited", "total_credits", "approved_count", "pending_count"}, w
+        assert w["balance"] == 100000 and w["total_deposited"] == 20000 and w["total_credits"] == 100000 and w["pending_count"] == 1
 
     def test_deposit_limits(self):
         s, _ = make_user()
@@ -151,7 +153,8 @@ class TestDeposits:
         r = s.post(f"{API}/deposits", json={"amount": 20000, "method": "upi"})
         assert r.status_code == 200
         d = r.json()
-        assert d["status"] == "pending" and d["service_fee"] == 4000 and d["net_real_credit"] == 16000 and d["promo_credit"] == 100000
+        assert d["status"] == "pending" and d["promo_credit"] == 100000 and d["promo_multiplier"] == 5
+        assert "service_fee" not in d and "net_real_credit" not in d
         assert any(x["id"] == d["id"] for x in s.get(f"{API}/deposits").json())
         pend = admin.get(f"{API}/admin/deposits", params={"status": "pending"}).json()
         assert any(x["id"] == d["id"] for x in pend)
@@ -159,19 +162,21 @@ class TestDeposits:
         assert a.status_code == 200 and a.json()["status"] == "approved"
         assert admin.post(f"{API}/admin/deposits/{d['id']}/approve").status_code == 409
         w = s.get(f"{API}/wallet").json()
-        assert w["real_balance"] == 16000 and w["promo_balance"] == 100000
+        assert w["balance"] == 100000 and w["total_deposited"] == 20000 and w["total_credits"] == 100000 and w["pending_count"] == 0
         txs = s.get(f"{API}/transactions").json()
-        kinds = sorted(t["type"] for t in txs)
-        assert kinds == ["deposit", "promo_credit", "service_fee"]
-        assert s.get(f"{API}/transactions", params={"wallet": "promo"}).json()[0]["amount"] == 100000
-        assert len(s.get(f"{API}/transactions", params={"type": "service_fee"}).json()) == 1
+        assert len(txs) == 1, txs
+        assert txs[0]["type"] == "deposit" and txs[0]["wallet"] == "credit" and txs[0]["amount"] == 100000 and txs[0]["balance_after"] == 100000
+        assert len(s.get(f"{API}/transactions", params={"type": "service_fee"}).json()) == 0
+        assert len(s.get(f"{API}/transactions", params={"type": "deposit"}).json()) == 1
+        assert mongo.transactions.count_documents({"type": "service_fee", "user_id": u["id"]}) == 0
 
     def test_reject_flow(self, admin):
         s, u = make_user()
         d = s.post(f"{API}/deposits", json={"amount": 5000, "method": "card"}).json()
         r = admin.post(f"{API}/admin/deposits/{d['id']}/reject", json={"reason": "TEST_bad proof"})
         assert r.status_code == 200 and r.json()["status"] == "rejected" and r.json()["reject_reason"] == "TEST_bad proof"
-        assert s.get(f"{API}/wallet").json()["real_balance"] == 0
+        assert s.get(f"{API}/wallet").json()["balance"] == 0
+        assert s.get(f"{API}/transactions").json() == []
 
     def test_fraud_high_amount_and_velocity(self, admin):
         s, u = make_user()
@@ -189,6 +194,35 @@ class TestDeposits:
         assert res and res[0]["status"] == "resolved"
         assert admin.post(f"{API}/admin/fraud/nonexistent/resolve").status_code == 404
 
+    def test_settings_update_and_restore(self, admin):
+        orig = admin.get(f"{API}/admin/settings").json()
+        body = {k: orig[k] for k in ("promo_multiplier", "min_deposit", "max_deposit",
+                                     "fraud_amount_threshold", "fraud_velocity_count", "packages")}
+        try:
+            assert admin.put(f"{API}/admin/settings", json=dict(body, min_deposit=10000, max_deposit=5000)).status_code == 400
+            assert admin.put(f"{API}/admin/settings", json=dict(body, packages=[500])).status_code == 400
+            assert admin.put(f"{API}/admin/settings", json=dict(body, promo_multiplier=11)).status_code == 422
+            r = admin.put(f"{API}/admin/settings", json=dict(body, promo_multiplier=4))
+            assert r.status_code == 200 and r.json()["promo_multiplier"] == 4
+            assert requests.get(f"{API}/public/config").json()["promo_multiplier"] == 4
+            s, _ = make_user()
+            d = s.post(f"{API}/deposits", json={"amount": 10000, "method": "upi"}).json()
+            assert d["promo_credit"] == 40000 and d["promo_multiplier"] == 4
+        finally:
+            r = admin.put(f"{API}/admin/settings", json=dict(body, promo_multiplier=5))
+            assert r.status_code == 200 and r.json()["promo_multiplier"] == 5
+
+
+# --- No withdrawals ---
+class TestNoWithdraw:
+    def test_no_withdraw_endpoints(self):
+        s, _ = login(*DEMO)
+        for p in ["withdraw", "withdrawals", "wallet/withdraw"]:
+            assert s.post(f"{API}/{p}", json={"amount": 100}).status_code in (404, 405), p
+        paths = requests.get(f"{BASE_URL}/api/openapi.json")
+        if paths.status_code == 200:
+            assert not any("withdraw" in k for k in paths.json().get("paths", {}))
+
 
 # --- Admin users ---
 class TestAdminUsers:
@@ -201,13 +235,19 @@ class TestAdminUsers:
         assert requests.post(f"{API}/auth/login", json={"email": u["email"], "password": "Test@12345"}).status_code == 403
         assert admin.patch(f"{API}/admin/users/{u['id']}/status", json={"status": "active"}).status_code == 200
         login(u["email"], "Test@12345")
-        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"wallet": "real", "amount": 500, "reason": "TEST_bonus"})
-        assert r.status_code == 200 and r.json()["real_balance"] == 500
-        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"wallet": "real", "amount": -1000, "reason": "TEST_over"})
+        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"amount": 500, "reason": "TEST_bonus"})
+        assert r.status_code == 200 and r.json()["promo_balance"] == 500
+        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"amount": -1000, "reason": "TEST_over"})
         assert r.status_code == 400
-        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"wallet": "real", "amount": -200, "reason": "TEST_ded"})
-        assert r.status_code == 200 and r.json()["real_balance"] == 300
-        assert admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"wallet": "real", "amount": 0, "reason": "TEST_z"}).status_code == 400
+        r = admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"amount": -200, "reason": "TEST_ded"})
+        assert r.status_code == 200 and r.json()["promo_balance"] == 300
+        assert s.get(f"{API}/wallet").json()["balance"] == 300
+        txs = s.get(f"{API}/transactions", params={"type": "admin_adjustment"}).json()
+        assert len(txs) == 2 and all(t["wallet"] == "credit" for t in txs) and txs[0]["balance_after"] == 300
+        assert admin.post(f"{API}/admin/users/{u['id']}/adjust", json={"amount": 0, "reason": "TEST_z"}).status_code == 400
+        assert admin.post(f"{API}/admin/users/nonexistent/adjust", json={"amount": 10, "reason": "TEST_n"}).status_code == 400
+        me = admin.get(f"{API}/auth/me").json()
+        assert admin.post(f"{API}/admin/users/{me['id']}/adjust", json={"amount": 10, "reason": "TEST_adm"}).status_code == 400
 
     def test_admin_self_status(self, admin):
         me = admin.get(f"{API}/auth/me").json()
@@ -215,26 +255,10 @@ class TestAdminUsers:
 
     def test_stats(self, admin):
         st = admin.get(f"{API}/admin/stats").json()
-        assert len(st["series"]) == 30 and "total_fees" in st and "pending_count" in st
-
-
-# --- Settings ---
-class TestSettings:
-    def test_update_and_restore(self, admin):
-        orig = admin.get(f"{API}/admin/settings").json()
-        body = {k: orig[k] for k in ("fee_percent", "promo_multiplier", "min_deposit", "max_deposit",
-                                     "fraud_amount_threshold", "fraud_velocity_count", "packages")}
-        try:
-            bad = dict(body, min_deposit=10000, max_deposit=5000)
-            assert admin.put(f"{API}/admin/settings", json=bad).status_code == 400
-            r = admin.put(f"{API}/admin/settings", json=dict(body, fee_percent=10, promo_multiplier=3))
-            assert r.status_code == 200 and r.json()["fee_percent"] == 10
-            s, _ = make_user()
-            d = s.post(f"{API}/deposits", json={"amount": 10000, "method": "upi"}).json()
-            assert d["service_fee"] == 1000 and d["promo_credit"] == 30000
-        finally:
-            r = admin.put(f"{API}/admin/settings", json=body)
-            assert r.status_code == 200 and r.json()["fee_percent"] == 20 and r.json()["promo_multiplier"] == 5
+        assert len(st["series"]) == 30 and "total_fees" not in st and "pending_count" in st
+        for k in ("total_deposits", "total_credits", "credit_outstanding"):
+            assert isinstance(st[k], (int, float)), k
+        assert set(st["series"][0]) == {"date", "deposits", "credits"}
 
 
 # --- Support ---
@@ -250,8 +274,10 @@ class TestSupport:
         assert ar["messages"][-1]["author_role"] == "admin"
         st = admin.patch(f"{API}/admin/tickets/{t['id']}/status", json={"status": "resolved"}).json()
         assert st["status"] == "resolved"
+        ar2 = admin.post(f"{API}/admin/tickets/{t['id']}/reply", json={"message": "admin reply 2"}).json()
+        assert ar2["status"] == "resolved"
         mine = s.get(f"{API}/support/tickets").json()
-        assert mine[0]["status"] == "resolved" and len(mine[0]["messages"]) == 3
+        assert mine[0]["status"] == "resolved" and len(mine[0]["messages"]) == 4
         # other user cannot reply to this ticket
         s2, _ = make_user()
         assert s2.post(f"{API}/support/tickets/{t['id']}/reply", json={"message": "x"}).status_code == 404

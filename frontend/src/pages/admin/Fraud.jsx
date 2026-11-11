@@ -25,7 +25,7 @@ export default function AdminFraud() {
   };
   return (
     <>
-      <PageHeader eyebrow="Fraud monitoring" title="Risk alerts" desc="Automatic rules flag high-value deposits, deposit velocity and repeated failed logins. Thresholds are set in Fee Config." />
+      <PageHeader eyebrow="Fraud monitoring" title="Risk alerts" desc="Automatic rules flag high-value deposits, deposit velocity and repeated failed logins. Thresholds are set in Credit Config." />
       <Tabs value={status} onValueChange={setStatus} className="mb-5">
         <TabsList className="bg-white/[0.03]">
           {["open", "resolved", "all"].map((s) => <TabsTrigger key={s} value={s} data-testid={`admin-fraud-tab-${s}`} className="capitalize data-[state=active]:bg-purple-600 data-[state=active]:text-white">{s}</TabsTrigger>)}

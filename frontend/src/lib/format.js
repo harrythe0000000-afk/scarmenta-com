@@ -24,6 +24,10 @@ export const methodLabel = (v) => METHODS.find((m) => m.value === v)?.label || v
 
 export const TX_TYPES = {
   deposit: "Credit Allocation",
+  bet: "Bet",
+  win: "Win",
+  rollback: "Bet Refund",
+  referral_bonus: "Referral Bonus",
   admin_adjustment: "Adjustment",
 };
 

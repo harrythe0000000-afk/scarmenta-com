@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -18,10 +18,17 @@ import AdminTransactions from "@/pages/admin/Transactions";
 import AdminFraud from "@/pages/admin/Fraud";
 import AdminSupport from "@/pages/admin/Support";
 import AdminSettings from "@/pages/admin/Settings";
+import UserGames from "@/pages/user/Games";
+import UserRefer from "@/pages/user/Refer";
+import AdminProviders from "@/pages/admin/Providers";
+import AdminGameActivity from "@/pages/admin/GameActivity";
+import AdminReferrals from "@/pages/admin/Referrals";
 
 const USER_NAV = [
   { id: "user-overview", to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
   { id: "user-deposits", to: "/app/deposits", label: "Deposits", icon: ArrowDownToLine },
+  { id: "user-games", to: "/app/games", label: "Games", icon: Gamepad2 },
+  { id: "user-refer", to: "/app/refer", label: "Refer & Earn", icon: Gift },
   { id: "user-statement", to: "/app/statement", label: "Statement", icon: ScrollText },
   { id: "user-support", to: "/app/support", label: "Support", icon: LifeBuoy },
 ];
@@ -31,9 +38,12 @@ const ADMIN_NAV = [
   { id: "admin-deposits", to: "/admin/deposits", label: "Deposits", icon: ArrowDownToLine },
   { id: "admin-users", to: "/admin/users", label: "Users", icon: Users },
   { id: "admin-transactions", to: "/admin/transactions", label: "Transactions", icon: Receipt },
+  { id: "admin-providers", to: "/admin/providers", label: "Game Providers", icon: Plug },
+  { id: "admin-game-activity", to: "/admin/game-activity", label: "Game Activity", icon: Dices },
+  { id: "admin-referrals", to: "/admin/referrals", label: "Referrals", icon: Gift },
   { id: "admin-fraud", to: "/admin/fraud", label: "Fraud Monitor", icon: ShieldAlert },
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
-  { id: "admin-settings", to: "/admin/settings", label: "Fee Config", icon: Settings2 },
+  { id: "admin-settings", to: "/admin/settings", label: "Credit Config", icon: Settings2 },
 ];
 
 function App() {
@@ -50,6 +60,8 @@ function App() {
           <Route path="/app" element={<ProtectedRoute role="user"><DashboardShell nav={USER_NAV} area="Player Account" /></ProtectedRoute>}>
             <Route index element={<UserOverview />} />
             <Route path="deposits" element={<UserDeposits />} />
+            <Route path="games" element={<UserGames />} />
+            <Route path="refer" element={<UserRefer />} />
             <Route path="statement" element={<UserStatement />} />
             <Route path="support" element={<UserSupport />} />
           </Route>
@@ -58,6 +70,9 @@ function App() {
             <Route path="deposits" element={<AdminDeposits />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="transactions" element={<AdminTransactions />} />
+            <Route path="providers" element={<AdminProviders />} />
+            <Route path="game-activity" element={<AdminGameActivity />} />
+            <Route path="referrals" element={<AdminReferrals />} />
             <Route path="fraud" element={<AdminFraud />} />
             <Route path="support" element={<AdminSupport />} />
             <Route path="settings" element={<AdminSettings />} />

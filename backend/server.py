@@ -1,7 +1,10 @@
 from core import (db, client, now, now_iso, new_id, clean, hash_password, verify_password, set_auth_cookies,
                   set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin,
-                  get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, FRONTEND_URL)
+                  get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, FRONTEND_URL, make_tx,
+                  unique_referral_code)
 from emailer import send_verification_email, send_reset_email
+import games
+import referrals
 
 import asyncio
 import logging
@@ -22,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 INDEXES: dict[str, list[IndexModel]] = {
     "users": [IndexModel([("email", ASCENDING)], name="email", unique=True),
-              IndexModel([("id", ASCENDING)], name="id", unique=True)],
+              IndexModel([("id", ASCENDING)], name="id", unique=True),
+              IndexModel([("referral_code", ASCENDING)], name="referral_code", unique=True, sparse=True),
+              IndexModel([("referred_by", ASCENDING)], name="referred_by")],
     "deposits": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                  IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
                  IndexModel([("status", ASCENDING), ("created_at", DESCENDING)], name="status_created")],
@@ -31,6 +36,15 @@ INDEXES: dict[str, list[IndexModel]] = {
     "tickets": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                 IndexModel([("user_id", ASCENDING), ("updated_at", DESCENDING)], name="user_updated")],
     "fraud_alerts": [IndexModel([("status", ASCENDING), ("created_at", DESCENDING)], name="status_created")],
+    "providers": [IndexModel([("id", ASCENDING)], name="id", unique=True),
+                  IndexModel([("code", ASCENDING)], name="code", unique=True),
+                  IndexModel([("api_key_hash", ASCENDING)], name="api_key_hash")],
+    "game_sessions": [IndexModel([("token", ASCENDING)], name="token", unique=True),
+                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=86400)],
+    "game_transactions": [IndexModel([("provider_id", ASCENDING), ("external_tx_id", ASCENDING)], name="provider_ext", unique=True),
+                          IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
+                          IndexModel([("provider_id", ASCENDING), ("round_id", ASCENDING), ("user_id", ASCENDING)], name="round"),
+                          IndexModel([("created_at", DESCENDING)], name="created_desc")],
     "login_attempts": [IndexModel([("identifier", ASCENDING)], name="identifier")],
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
@@ -58,6 +72,7 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     country: Optional[str] = Field(default=None, max_length=60)
+    referral_code: Optional[str] = Field(default=None, max_length=20)
 
 
 class LoginIn(BaseModel):
@@ -116,16 +131,11 @@ class SettingsIn(BaseModel):
     max_deposit: float = Field(gt=0)
     fraud_amount_threshold: float = Field(gt=0)
     fraud_velocity_count: int = Field(ge=1, le=50)
+    referral_bonus_percent: float = Field(ge=0, le=100)
     packages: List[float] = Field(min_length=1, max_length=8)
 
 
 # ---------- Helpers ----------
-def make_tx(user: dict, kind: str, wallet: str, amount: float, description: str, reference: str, balance_after: float) -> dict:
-    return {"id": new_id(), "user_id": user["id"], "user_email": user["email"], "user_name": user.get("name", ""),
-            "type": kind, "wallet": wallet, "amount": round(amount, 2), "description": description,
-            "reference": reference, "balance_after": round(balance_after, 2), "created_at": now_iso()}
-
-
 async def credit_deposit(dep: dict) -> None:
     user = await db.users.find_one_and_update(
         {"id": dep["user_id"]},
@@ -174,9 +184,17 @@ async def register(body: RegisterIn, response: Response):
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="An account with this email already exists")
+    referrer = None
+    if body.referral_code and body.referral_code.strip():
+        referrer = await db.users.find_one({"referral_code": body.referral_code.strip().upper(), "role": "user"},
+                                           {"_id": 0, "id": 1, "email": 1})
+        if not referrer:
+            raise HTTPException(status_code=400, detail="Invalid referral code")
     user = {"id": new_id(), "email": email, "name": body.name.strip(), "country": body.country,
             "password_hash": hash_password(body.password), "role": "user", "status": "active",
-            "email_verified": False, "real_balance": 0.0, "promo_balance": 0.0, "created_at": now_iso()}
+            "email_verified": False, "promo_balance": 0.0, "referral_code": await unique_referral_code(),
+            "referred_by": referrer["id"] if referrer else None,
+            "referred_by_email": referrer["email"] if referrer else None, "created_at": now_iso()}
     await db.users.insert_one(user)
     sent = await send_verification(user)
     set_auth_cookies(response, user)
@@ -462,6 +480,7 @@ async def admin_approve(dep_id: str, admin: dict = Depends(require_admin)):
     if not dep:
         raise HTTPException(status_code=409, detail="Deposit not found or already reviewed")
     await credit_deposit(dep)
+    await referrals.reward_referrer(dep)
     return dep
 
 
@@ -547,13 +566,14 @@ async def seed() -> None:
     if not await db.users.find_one({"email": admin_email}):
         await db.users.insert_one({"id": new_id(), "email": admin_email, "name": "Platform Admin",
                                    "password_hash": hash_password(os.environ["ADMIN_PASSWORD"]), "role": "admin",
-                                   "status": "active", "email_verified": True, "real_balance": 0.0,
+                                   "status": "active", "email_verified": True,
                                    "promo_balance": 0.0, "created_at": now_iso()})
     demo_email = os.environ["DEMO_EMAIL"].lower()
     if not await db.users.find_one({"email": demo_email}):
         demo = {"id": new_id(), "email": demo_email, "name": "Demo Player", "country": "India",
                 "password_hash": hash_password(os.environ["DEMO_PASSWORD"]), "role": "user", "status": "active",
-                "email_verified": True, "real_balance": 0.0, "promo_balance": 0.0, "created_at": now_iso()}
+                "email_verified": True, "promo_balance": 0.0, "referral_code": await unique_referral_code(),
+                "created_at": now_iso()}
         await db.users.insert_one(demo)
         s = await get_settings()
         for amount, status in ((20000.0, "approved"), (50000.0, "pending")):
@@ -569,6 +589,8 @@ async def seed() -> None:
 
 
 app.include_router(api)
+app.include_router(referrals.router)
+app.include_router(games.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[FRONTEND_URL],
                    allow_methods=["*"], allow_headers=["*"])
 
