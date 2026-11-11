@@ -61,8 +61,8 @@ const Hero = ({ config }) => {
             <span className="text-gradient">accounted to the rupee.</span>
           </h1>
           <p className="fade-up d-2 mt-6 max-w-xl text-base text-slate-400 sm:text-lg">
-            Aetheria is the technology layer that manages prepaid credit packages, separate real-money and promotional wallets,
-            service fees and revenue reporting — with fully transparent ledgers.
+            Aetheria is the technology layer that manages prepaid credit packages, 5X credit allocation and revenue
+            reporting — with fully transparent ledgers and zero service fees.
           </p>
           <div className="fade-up d-3 mt-9 flex flex-wrap gap-3">
             <Button asChild data-testid="landing-hero-cta-button" className="h-12 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-7 text-base font-semibold hover:from-violet-500 hover:to-fuchsia-500">
@@ -73,7 +73,7 @@ const Hero = ({ config }) => {
             </Button>
           </div>
           <div className="fade-up d-4 mt-12 grid max-w-lg grid-cols-3 gap-6 border-t border-white/5 pt-6">
-            {[[`${config?.promo_multiplier ?? 5}X`, "Promo ratio"], [`${config?.fee_percent ?? 20}%`, "Flat tech fee"], ["2", "Segregated wallets"]].map(([v, l]) => (
+            {[[`${config?.promo_multiplier ?? 5}X`, "Credit ratio"], ["0%", "Service fees"], ["24/7", "Ledger access"]].map(([v, l]) => (
               <div key={l}>
                 <p className="font-num text-2xl font-semibold text-white">{v}</p>
                 <p className="text-xs uppercase tracking-wider text-slate-500">{l}</p>
@@ -83,7 +83,7 @@ const Hero = ({ config }) => {
         </div>
         <div className="fade-up d-2 card-lux glow-violet p-6 sm:p-8" data-testid="landing-calculator-card">
           <p className="label-eyebrow">Live credit calculator</p>
-          <h2 className="mt-2 font-display text-xl font-semibold text-white">See exactly where every rupee goes</h2>
+          <h2 className="mt-2 font-display text-xl font-semibold text-white">See your credit balance instantly</h2>
           <div className="mt-6">
             <CreditCalculator config={config} amount={amount} onChange={setAmount} testPrefix="landing-calc" />
           </div>
@@ -95,15 +95,15 @@ const Hero = ({ config }) => {
 
 const STEPS = [
   { icon: Wallet, title: "Deposit", text: "Purchase a prepaid package via UPI, NetBanking, card, AED wire or USDT." },
-  { icon: Receipt, title: "Service fee", text: "A flat technology service fee is recorded transparently on your ledger." },
-  { icon: ShieldCheck, title: "Real wallet", text: "The net amount lands in your segregated real-money wallet." },
-  { icon: Sparkles, title: "Promo credits", text: "Promotional credits are allocated at the published multiplier." },
+  { icon: ShieldCheck, title: "Review", text: "Each deposit is checked by our compliance team before credits are issued." },
+  { icon: Sparkles, title: "5X credits", text: "Your balance is credited at 5X the cash deposited — no service fees." },
+  { icon: Receipt, title: "Ledger", text: "Every allocation is recorded on your downloadable account statement." },
 ];
 
 const HowItWorks = () => (
   <section id="how" className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
     <p className="label-eyebrow">The credit model</p>
-    <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">Four ledger entries. Zero ambiguity.</h2>
+    <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">Deposit once. Get 5X credit.</h2>
     <div className="mt-14 grid gap-4 md:grid-cols-4">
       {STEPS.map((s, i) => (
         <div key={s.title} className="card-lux p-6 hover:-translate-y-1" data-testid={`how-step-${i + 1}`}>
@@ -134,12 +134,10 @@ const Packages = ({ config }) => (
               <p className="text-xs uppercase tracking-widest text-slate-500">You pay</p>
               <p className="mt-1 font-num text-2xl font-semibold text-white">{inr(p)}</p>
               <div className="my-5 h-px bg-white/5" />
-              <p className="text-xs text-slate-500">Promotional credits</p>
-              <p className="font-num text-lg font-semibold text-purple-300">{inr(b.promo)}</p>
-              <p className="mt-3 text-xs text-slate-500">Real wallet</p>
-              <p className="font-num text-sm text-emerald-300">{inr(b.real)}</p>
-              <p className="mt-3 text-xs text-slate-500">Tech fee</p>
-              <p className="font-num text-sm text-slate-400">{inr(b.fee)}</p>
+              <p className="text-xs text-slate-500">Credit balance</p>
+              <p className="font-num text-lg font-semibold text-purple-300">{inr(b.credits)}</p>
+              <p className="mt-3 text-xs text-slate-500">Service fee</p>
+              <p className="font-num text-sm text-emerald-300">₹0</p>
             </div>
           );
         })}
@@ -150,8 +148,8 @@ const Packages = ({ config }) => (
 
 const TRUST = [
   { icon: Building2, title: "Cyprus-registered entity", text: "Operated from an EU jurisdiction with documented governance." },
-  { icon: Scale, title: "Transparent accounting", text: "Every deposit, fee and allocation is an immutable ledger line." },
-  { icon: Lock, title: "Encrypted & segregated", text: "Real-money and promotional balances are never commingled." },
+  { icon: Scale, title: "Transparent accounting", text: "Every deposit and credit allocation is an immutable ledger line." },
+  { icon: Lock, title: "Encrypted & audited", text: "Every rupee deposited and every credit issued is traceable." },
   { icon: Globe2, title: "Authorized markets only", text: "Gaming activity is restricted to legally authorized jurisdictions." },
 ];
 

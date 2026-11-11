@@ -46,7 +46,8 @@ export default function AdminSettings() {
     setBusy(true);
     try {
       const packages = pkgText.split(",").map((x) => Number(x.trim())).filter((x) => x > 0);
-      const body = { ...s, packages, min_deposit: Number(s.min_deposit), max_deposit: Number(s.max_deposit),
+      const { fee_percent, ...rest } = s;
+      const body = { ...rest, packages, min_deposit: Number(s.min_deposit), max_deposit: Number(s.max_deposit),
         fraud_amount_threshold: Number(s.fraud_amount_threshold), fraud_velocity_count: Number(s.fraud_velocity_count) };
       const { data: saved } = await api.put("/admin/settings", body);
       setS(saved);
@@ -61,18 +62,15 @@ export default function AdminSettings() {
 
   return (
     <>
-      <PageHeader eyebrow="Service fee configuration" title="Credit engine settings" desc="Changes apply to deposits created after saving. Existing deposits keep the terms they were created with."
+      <PageHeader eyebrow="Credit configuration" title="Credit engine settings" desc="Changes apply to deposits created after saving. Existing deposits keep the terms they were created with."
         action={<Button data-testid="settings-save-button" disabled={busy} onClick={save} className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6"><Save className="mr-2 h-4 w-4" /> Save changes</Button>} />
       <div className="grid gap-5 lg:grid-cols-2">
-        <SliderField label="Technology service fee" value={s.fee_percent} min={0} max={50} step={0.5} suffix="%" onChange={set("fee_percent")} testId="fee-config-slider" />
-        <SliderField label="Promotional credit multiplier" value={s.promo_multiplier} min={1} max={10} step={0.5} suffix="X" onChange={set("promo_multiplier")} testId="multiplier-config-slider" />
-      </div>
-      <div className="mt-5 card-lux p-6" data-testid="settings-preview">
-        <p className="label-eyebrow">Live preview · ₹20,000 deposit</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div><p className="text-xs text-slate-500">Service fee</p><p className="font-num text-xl text-slate-300">{inr(example.fee)}</p></div>
-          <div><p className="text-xs text-slate-500">Real wallet</p><p className="font-num text-xl text-emerald-300">{inr(example.real)}</p></div>
-          <div><p className="text-xs text-slate-500">Promo credits</p><p className="font-num text-xl text-purple-300">{inr(example.promo)}</p></div>
+        <SliderField label="Credit multiplier" value={s.promo_multiplier} min={1} max={10} step={0.5} suffix="X" onChange={set("promo_multiplier")} testId="multiplier-config-slider" />
+        <div className="card-lux p-6" data-testid="settings-preview">
+          <p className="label-eyebrow">Live preview · ₹20,000 deposit</p>
+          <p className="mt-6 text-xs text-slate-500">Player credit balance</p>
+          <p className="font-num text-3xl font-semibold text-purple-300">{inr(example.credits)}</p>
+          <p className="mt-2 text-xs text-slate-500">No service fee is charged.</p>
         </div>
       </div>
       <div className="mt-5 grid gap-5 lg:grid-cols-2">

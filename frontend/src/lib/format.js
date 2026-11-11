@@ -8,11 +8,9 @@ export const fmtDate = (iso) =>
     ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "—";
 
-export const calc = (amount, cfg) => {
-  const a = Number(amount) || 0;
-  const fee = +((a * (cfg?.fee_percent ?? 20)) / 100).toFixed(2);
-  return { fee, real: +(a - fee).toFixed(2), promo: +(a * (cfg?.promo_multiplier ?? 5)).toFixed(2) };
-};
+export const calc = (amount, cfg) => ({
+  credits: +((Number(amount) || 0) * (cfg?.promo_multiplier ?? 5)).toFixed(2),
+});
 
 export const METHODS = [
   { value: "upi", label: "UPI", hint: "Instant · India" },
@@ -25,9 +23,7 @@ export const METHODS = [
 export const methodLabel = (v) => METHODS.find((m) => m.value === v)?.label || v;
 
 export const TX_TYPES = {
-  deposit: "Deposit",
-  service_fee: "Service Fee",
-  promo_credit: "Promo Credit",
+  deposit: "Credit Allocation",
   admin_adjustment: "Adjustment",
 };
 

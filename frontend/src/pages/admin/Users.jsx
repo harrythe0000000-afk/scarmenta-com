@@ -4,7 +4,6 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -13,7 +12,7 @@ import { useFetch } from "@/lib/hooks";
 import { fmtDate, inr } from "@/lib/format";
 
 const AdjustDialog = ({ user, onClose, onDone }) => {
-  const [form, setForm] = useState({ wallet: "real", amount: "", reason: "" });
+  const [form, setForm] = useState({ amount: "", reason: "" });
   const submit = async () => {
     try {
       await api.post(`/admin/users/${user.id}/adjust`, { ...form, amount: Number(form.amount) });
@@ -31,10 +30,6 @@ const AdjustDialog = ({ user, onClose, onDone }) => {
           <DialogTitle className="text-white">Adjust balance · {user?.name}</DialogTitle>
           <DialogDescription>Use a negative amount to debit. Every adjustment is recorded on the user ledger.</DialogDescription>
         </DialogHeader>
-        <Select value={form.wallet} onValueChange={(v) => setForm({ ...form, wallet: v })}>
-          <SelectTrigger data-testid="adjust-wallet-select" className="border-purple-500/20 bg-black/40"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="real">Real money wallet</SelectItem><SelectItem value="promo">Promotional wallet</SelectItem></SelectContent>
-        </Select>
         <Input data-testid="adjust-amount-input" type="number" placeholder="Amount e.g. 500 or -500" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="border-purple-500/20 bg-black/40 font-num" />
         <Input data-testid="adjust-reason-input" placeholder="Reason (required)" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} className="border-purple-500/20 bg-black/40" />
         <DialogFooter>
@@ -76,7 +71,7 @@ export default function AdminUsers() {
           <Table>
             <TableHeader>
               <TableRow className="border-white/5 hover:bg-transparent">
-                {["User", "Role", "Email", "Real", "Promo", "Joined", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
+                {["User", "Role", "Email", "Credit balance", "Joined", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -85,7 +80,6 @@ export default function AdminUsers() {
                   <TableCell><p className="text-sm text-white">{u.name}</p><p className="text-xs text-slate-500">{u.email}</p></TableCell>
                   <TableCell className="text-xs uppercase tracking-wider text-slate-400">{u.role}</TableCell>
                   <TableCell><StatusBadge status={u.email_verified ? "verified" : "unverified"} /></TableCell>
-                  <TableCell className="font-num text-sm text-emerald-300">{inr(u.real_balance)}</TableCell>
                   <TableCell className="font-num text-sm text-purple-300">{inr(u.promo_balance)}</TableCell>
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(u.created_at)}</TableCell>
                   <TableCell><StatusBadge status={u.status} testId={`admin-user-status-${u.email}`} /></TableCell>

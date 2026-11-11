@@ -55,7 +55,7 @@ export default function AdminDeposits() {
 
   return (
     <>
-      <PageHeader eyebrow="Deposit monitoring" title="Approval queue" desc="Approving a deposit credits the real wallet (net of fee) and allocates promotional credits." />
+      <PageHeader eyebrow="Deposit monitoring" title="Approval queue" desc="Approving a deposit adds credits to the player's balance at the configured multiplier." />
       <Tabs value={status} onValueChange={setStatus} className="mb-5">
         <TabsList className="bg-white/[0.03]">
           {["pending", "approved", "rejected", "all"].map((s) => <TabsTrigger key={s} value={s} data-testid={`admin-deposits-tab-${s}`} className="capitalize data-[state=active]:bg-purple-600 data-[state=active]:text-white">{s}</TabsTrigger>)}
@@ -66,7 +66,7 @@ export default function AdminDeposits() {
           <Table>
             <TableHeader>
               <TableRow className="border-white/5 hover:bg-transparent">
-                {["Reference", "Player", "Date", "Method", "Amount", "Fee / Real / Promo", "Risk", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
+                {["Reference", "Player", "Date", "Method", "Cash paid", "Credits", "Risk", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -77,9 +77,7 @@ export default function AdminDeposits() {
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(d.created_at)}</TableCell>
                   <TableCell className="text-xs text-slate-300">{methodLabel(d.method)}</TableCell>
                   <TableCell className="font-num text-sm font-semibold text-white">{inr(d.amount)}</TableCell>
-                  <TableCell className="whitespace-nowrap font-num text-xs">
-                    <span className="text-slate-400">{inr(d.service_fee)}</span> / <span className="text-emerald-300">{inr(d.net_real_credit)}</span> / <span className="text-purple-300">{inr(d.promo_credit)}</span>
-                  </TableCell>
+                  <TableCell className="whitespace-nowrap font-num text-sm text-purple-300">{inr(d.promo_credit)}</TableCell>
                   <TableCell><Risk score={d.risk_score} flags={d.fraud_flags} /></TableCell>
                   <TableCell><StatusBadge status={d.status} /></TableCell>
                   <TableCell>

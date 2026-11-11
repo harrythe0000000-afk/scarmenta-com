@@ -21,17 +21,6 @@ export const TxFilters = ({ filters, setFilters, extra }) => {
         </Select>
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] uppercase tracking-wider text-slate-500">Wallet</p>
-        <Select value={filters.wallet || "all"} onValueChange={(v) => set("wallet")(v === "all" ? "" : v)}>
-          <SelectTrigger data-testid="tx-filter-wallet" className="w-36 border-purple-500/20 bg-black/40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Both wallets</SelectItem>
-            <SelectItem value="real">Real money</SelectItem>
-            <SelectItem value="promo">Promotional</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
         <p className="mb-1.5 text-[11px] uppercase tracking-wider text-slate-500">From</p>
         <Input type="date" data-testid="tx-filter-start" value={filters.start} onChange={(e) => set("start")(e.target.value)} className="w-40 border-purple-500/20 bg-black/40 [color-scheme:dark]" />
       </div>
@@ -51,17 +40,14 @@ export const buildQuery = (base, filters) => {
 
 export const exportTx = (rows, name) =>
   downloadCSV(name, [
-    ["Date", "User", "Type", "Wallet", "Description", "Reference", "Amount (INR)", "Balance after (INR)"],
-    ...rows.map((t) => [t.created_at, t.user_email, TX_TYPES[t.type] || t.type, t.wallet, t.description, t.reference, t.amount, t.balance_after]),
+    ["Date", "User", "Type", "Description", "Reference", "Credits (INR)", "Balance after (INR)"],
+    ...rows.map((t) => [t.created_at, t.user_email, TX_TYPES[t.type] || t.type, t.description, t.reference, t.amount, t.balance_after]),
   ]);
 
 export const useTotals = (rows) =>
   useMemo(() => {
-    const r = { real: { credits: 0, debits: 0 }, promo: { credits: 0, debits: 0 } };
-    (rows || []).forEach((t) => {
-      const w = r[t.wallet] || r.real;
-      t.amount >= 0 ? (w.credits += t.amount) : (w.debits += t.amount);
-    });
+    const r = { credits: 0, debits: 0 };
+    (rows || []).forEach((t) => (t.amount >= 0 ? (r.credits += t.amount) : (r.debits += t.amount)));
     return r;
   }, [rows]);
 
@@ -79,7 +65,7 @@ export const StatementActions = ({ rows, name }) => (
 export const TotalsBar = ({ totals, count }) => (
   <div className="mb-5 flex flex-wrap gap-6 text-sm" data-testid="statement-totals">
     <span className="text-slate-400">Entries: <b className="font-num text-white">{count}</b></span>
-    <span className="text-slate-400">Real money: <b className="font-num text-emerald-300">+{inr(totals.real.credits)}</b> / <b className="font-num text-red-300">−{inr(Math.abs(totals.real.debits))}</b></span>
-    <span className="text-slate-400">Promo: <b className="font-num text-purple-300">+{inr(totals.promo.credits)}</b> / <b className="font-num text-red-300">−{inr(Math.abs(totals.promo.debits))}</b></span>
+    <span className="text-slate-400">Credited: <b className="font-num text-emerald-300">{inr(totals.credits)}</b></span>
+    <span className="text-slate-400">Debited: <b className="font-num text-red-300">{inr(Math.abs(totals.debits))}</b></span>
   </div>
 );

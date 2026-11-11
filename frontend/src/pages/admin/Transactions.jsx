@@ -11,7 +11,7 @@ export default function AdminTransactions() {
   const totals = useTotals(data);
   return (
     <>
-      <PageHeader eyebrow="Transaction monitoring" title="Platform ledger" desc="Every deposit, fee, promotional allocation and manual adjustment across all accounts."
+      <PageHeader eyebrow="Transaction monitoring" title="Platform ledger" desc="Every credit allocation and manual adjustment across all accounts."
         action={<StatementActions rows={data} name={`aetheria-ledger-${new Date().toISOString().slice(0, 10)}.csv`} />} />
       <TxFilters filters={filters} setFilters={setFilters}
         extra={

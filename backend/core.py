@@ -19,7 +19,6 @@ FRONTEND_URL = os.environ["FRONTEND_URL"]
 JWT_ALGORITHM = "HS256"
 
 DEFAULT_SETTINGS = {
-    "fee_percent": 20.0,
     "promo_multiplier": 5.0,
     "min_deposit": 1000.0,
     "max_deposit": 500000.0,
@@ -126,14 +125,7 @@ async def get_settings() -> dict:
 
 
 def compute_breakdown(amount: float, s: dict) -> dict:
-    fee = round(amount * s["fee_percent"] / 100, 2)
-    return {
-        "fee_percent": s["fee_percent"],
-        "promo_multiplier": s["promo_multiplier"],
-        "service_fee": fee,
-        "net_real_credit": round(amount - fee, 2),
-        "promo_credit": round(amount * s["promo_multiplier"], 2),
-    }
+    return {"promo_multiplier": s["promo_multiplier"], "promo_credit": round(amount * s["promo_multiplier"], 2)}
 
 
 def client_ip(request: Request) -> str:

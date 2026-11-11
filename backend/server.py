@@ -98,7 +98,6 @@ class UserStatusIn(BaseModel):
 
 
 class AdjustIn(BaseModel):
-    wallet: Literal["real", "promo"]
     amount: float
     reason: str = Field(min_length=3, max_length=200)
 
@@ -112,7 +111,6 @@ class TicketStatusIn(BaseModel):
 
 
 class SettingsIn(BaseModel):
-    fee_percent: float = Field(ge=0, le=50)
     promo_multiplier: float = Field(ge=1, le=10)
     min_deposit: float = Field(gt=0)
     max_deposit: float = Field(gt=0)
@@ -131,17 +129,11 @@ def make_tx(user: dict, kind: str, wallet: str, amount: float, description: str,
 async def credit_deposit(dep: dict) -> None:
     user = await db.users.find_one_and_update(
         {"id": dep["user_id"]},
-        {"$inc": {"real_balance": dep["net_real_credit"], "promo_balance": dep["promo_credit"]}},
+        {"$inc": {"promo_balance": dep["promo_credit"]}},
         projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-    ref = dep["reference"]
-    await db.transactions.insert_many([
-        make_tx(user, "deposit", "real", dep["amount"], f"Deposit {ref} via {dep['method'].upper()}", ref,
-                user["real_balance"] + dep["service_fee"]),
-        make_tx(user, "service_fee", "real", -dep["service_fee"], f"{dep['fee_percent']:g}% technology service fee", ref,
-                user["real_balance"]),
-        make_tx(user, "promo_credit", "promo", dep["promo_credit"], f"{dep['promo_multiplier']:g}X promotional credit allocation",
-                ref, user["promo_balance"]),
-    ])
+    desc = f"₹{dep['amount']:,.0f} deposit via {dep['method'].upper()} · {dep['promo_multiplier']:g}X credit allocation"
+    await db.transactions.insert_one(make_tx(user, "deposit", "credit", dep["promo_credit"], desc, dep["reference"],
+                                             user["promo_balance"]))
 
 
 async def add_alert(kind: str, severity: str, message: str, user: Optional[dict] = None, reference: str = "") -> None:
@@ -284,7 +276,7 @@ async def reset_password(body: ResetIn):
 @api.get("/public/config")
 async def public_config():
     s = await get_settings()
-    return {k: s[k] for k in ("fee_percent", "promo_multiplier", "min_deposit", "max_deposit", "packages")}
+    return {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages")}
 
 
 # ---------- User ----------
@@ -292,13 +284,12 @@ async def public_config():
 async def wallet(user: dict = Depends(get_current_user)):
     agg = await db.deposits.aggregate([
         {"$match": {"user_id": user["id"], "status": "approved"}},
-        {"$group": {"_id": None, "deposited": {"$sum": "$amount"}, "fees": {"$sum": "$service_fee"},
-                    "promo": {"$sum": "$promo_credit"}, "count": {"$sum": 1}}}]).to_list(1)
-    totals = agg[0] if agg else {"deposited": 0, "fees": 0, "promo": 0, "count": 0}
+        {"$group": {"_id": None, "deposited": {"$sum": "$amount"}, "credits": {"$sum": "$promo_credit"},
+                    "count": {"$sum": 1}}}]).to_list(1)
+    totals = agg[0] if agg else {"deposited": 0, "credits": 0, "count": 0}
     pending = await db.deposits.count_documents({"user_id": user["id"], "status": "pending"})
-    return {"real_balance": user.get("real_balance", 0), "promo_balance": user.get("promo_balance", 0),
-            "total_deposited": totals["deposited"], "total_fees": totals["fees"], "total_promo": totals["promo"],
-            "approved_count": totals["count"], "pending_count": pending}
+    return {"balance": user.get("promo_balance", 0), "total_deposited": totals["deposited"],
+            "total_credits": totals["credits"], "approved_count": totals["count"], "pending_count": pending}
 
 
 @api.post("/deposits")
@@ -392,31 +383,29 @@ async def reply_ticket(ticket_id: str, body: ReplyIn, user: dict = Depends(get_c
 async def admin_stats(_: dict = Depends(require_admin)):
     agg = await db.deposits.aggregate([
         {"$match": {"status": "approved"}},
-        {"$group": {"_id": None, "deposits": {"$sum": "$amount"}, "fees": {"$sum": "$service_fee"},
-                    "promo": {"$sum": "$promo_credit"}, "count": {"$sum": 1}}}]).to_list(1)
-    t = agg[0] if agg else {"deposits": 0, "fees": 0, "promo": 0, "count": 0}
+        {"$group": {"_id": None, "deposits": {"$sum": "$amount"}, "credits": {"$sum": "$promo_credit"},
+                    "count": {"$sum": 1}}}]).to_list(1)
+    t = agg[0] if agg else {"deposits": 0, "credits": 0, "count": 0}
     bal = await db.users.aggregate([
         {"$match": {"role": "user"}},
-        {"$group": {"_id": None, "real": {"$sum": "$real_balance"}, "promo": {"$sum": "$promo_balance"}}}]).to_list(1)
-    b = bal[0] if bal else {"real": 0, "promo": 0}
+        {"$group": {"_id": None, "credits": {"$sum": "$promo_balance"}}}]).to_list(1)
     since_day = (now() - timedelta(days=29)).date()
     rows = await db.deposits.find({"status": "approved", "reviewed_at": {"$gte": since_day.isoformat()}},
-                                  {"_id": 0, "amount": 1, "service_fee": 1, "promo_credit": 1, "reviewed_at": 1}).to_list(10000)
-    buckets = {(since_day + timedelta(days=i)).isoformat(): {"deposits": 0, "fees": 0, "promo": 0} for i in range(30)}
+                                  {"_id": 0, "amount": 1, "promo_credit": 1, "reviewed_at": 1}).to_list(10000)
+    buckets = {(since_day + timedelta(days=i)).isoformat(): {"deposits": 0, "credits": 0} for i in range(30)}
     for r in rows:
         d = buckets.get(r["reviewed_at"][:10])
         if d:
             d["deposits"] += r["amount"]
-            d["fees"] += r["service_fee"]
-            d["promo"] += r["promo_credit"]
+            d["credits"] += r["promo_credit"]
     return {
-        "total_deposits": t["deposits"], "total_fees": t["fees"], "total_promo": t["promo"], "approved_count": t["count"],
+        "total_deposits": t["deposits"], "total_credits": t["credits"], "approved_count": t["count"],
         "pending_count": await db.deposits.count_documents({"status": "pending"}),
         "users_count": await db.users.count_documents({"role": "user"}),
         "verified_users": await db.users.count_documents({"role": "user", "email_verified": True}),
         "open_alerts": await db.fraud_alerts.count_documents({"status": "open"}),
         "open_tickets": await db.tickets.count_documents({"status": "open"}),
-        "real_liability": b["real"], "promo_liability": b["promo"],
+        "credit_outstanding": bal[0]["credits"] if bal else 0,
         "series": [{"date": k, **v} for k, v in buckets.items()],
     }
 
@@ -444,7 +433,7 @@ async def admin_user_status(user_id: str, body: UserStatusIn, admin: dict = Depe
 async def admin_adjust(user_id: str, body: AdjustIn, admin: dict = Depends(require_admin)):
     if body.amount == 0:
         raise HTTPException(status_code=400, detail="Amount cannot be zero")
-    field = "real_balance" if body.wallet == "real" else "promo_balance"
+    field = "promo_balance"
     flt = {"id": user_id, "role": "user"}
     if body.amount < 0:
         flt[field] = {"$gte": -body.amount}
@@ -453,7 +442,7 @@ async def admin_adjust(user_id: str, body: AdjustIn, admin: dict = Depends(requi
     if not user:
         raise HTTPException(status_code=400, detail="User not found or insufficient balance")
     ref = f"ADJ-{secrets.token_hex(3).upper()}"
-    await db.transactions.insert_one(make_tx(user, "admin_adjustment", body.wallet, body.amount,
+    await db.transactions.insert_one(make_tx(user, "admin_adjustment", "credit", body.amount,
                                              f"Admin adjustment: {body.reason} (by {admin['email']})", ref, user[field]))
     return user
 
