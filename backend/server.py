@@ -194,7 +194,7 @@ async def register(body: RegisterIn, response: Response):
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower()
-    ident = f"{client_ip(request)}:{email}"
+    ident = f"email:{email}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("locked_until") and att["locked_until"] > now_iso():
         raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
@@ -204,9 +204,11 @@ async def login(body: LoginIn, request: Request, response: Response):
         update = {"count": count, "updated_at": now_iso()}
         if count >= 5:
             update = {"count": 0, "locked_until": (now() + timedelta(minutes=15)).isoformat()}
-            await add_alert("login_lockout", "medium", f"5 failed login attempts for {email} from {client_ip(request)}",
+            await add_alert("login_lockout", "medium", f"5 failed login attempts for {email} (last from {client_ip(request)})",
                             clean(dict(user)) if user else None)
         await db.login_attempts.update_one({"identifier": ident}, {"$set": update}, upsert=True)
+        if count >= 5:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if user.get("status") == "suspended":
         raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
@@ -373,7 +375,7 @@ async def append_reply(ticket_id: str, user: dict, message: str, base_filter: di
     msg = {"author_role": user["role"], "author_name": user["name"], "message": message, "created_at": now_iso()}
     t = await db.tickets.find_one_and_update(
         {"id": ticket_id, **base_filter},
-        {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "status": "open"}},
+        {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), **({"status": "open"} if user["role"] == "user" else {})}},
         projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not t:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -505,6 +507,8 @@ async def admin_get_settings(_: dict = Depends(require_admin)):
 async def admin_put_settings(body: SettingsIn, admin: dict = Depends(require_admin)):
     if body.min_deposit >= body.max_deposit:
         raise HTTPException(status_code=400, detail="Minimum deposit must be lower than maximum")
+    if any(p < body.min_deposit or p > body.max_deposit for p in body.packages):
+        raise HTTPException(status_code=400, detail="Every package must be within the min/max deposit limits")
     data = body.model_dump()
     data["packages"] = sorted({round(p, 2) for p in body.packages if p > 0})
     data.update({"updated_at": now_iso(), "updated_by": admin["email"]})

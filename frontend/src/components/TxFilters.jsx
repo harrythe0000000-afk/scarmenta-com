@@ -57,8 +57,11 @@ export const exportTx = (rows, name) =>
 
 export const useTotals = (rows) =>
   useMemo(() => {
-    const r = { credits: 0, debits: 0 };
-    (rows || []).forEach((t) => (t.amount >= 0 ? (r.credits += t.amount) : (r.debits += t.amount)));
+    const r = { real: { credits: 0, debits: 0 }, promo: { credits: 0, debits: 0 } };
+    (rows || []).forEach((t) => {
+      const w = r[t.wallet] || r.real;
+      t.amount >= 0 ? (w.credits += t.amount) : (w.debits += t.amount);
+    });
     return r;
   }, [rows]);
 
@@ -76,7 +79,7 @@ export const StatementActions = ({ rows, name }) => (
 export const TotalsBar = ({ totals, count }) => (
   <div className="mb-5 flex flex-wrap gap-6 text-sm" data-testid="statement-totals">
     <span className="text-slate-400">Entries: <b className="font-num text-white">{count}</b></span>
-    <span className="text-slate-400">Credits: <b className="font-num text-emerald-300">{inr(totals.credits)}</b></span>
-    <span className="text-slate-400">Debits: <b className="font-num text-red-300">{inr(Math.abs(totals.debits))}</b></span>
+    <span className="text-slate-400">Real money: <b className="font-num text-emerald-300">+{inr(totals.real.credits)}</b> / <b className="font-num text-red-300">−{inr(Math.abs(totals.real.debits))}</b></span>
+    <span className="text-slate-400">Promo: <b className="font-num text-purple-300">+{inr(totals.promo.credits)}</b> / <b className="font-num text-red-300">−{inr(Math.abs(totals.promo.debits))}</b></span>
   </div>
 );

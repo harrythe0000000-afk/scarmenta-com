@@ -28,7 +28,7 @@ export const TicketThread = ({ ticket, onReply, viewerRole }) => {
         </div>
         <StatusBadge status={ticket.status} testId="ticket-thread-status" />
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto py-4 max-h-[420px]">
+      <div className="flex-1 space-y-3 overflow-y-auto py-4 max-h-[380px]">
         {ticket.messages.map((m, i) => {
           const mine = m.author_role === viewerRole;
           return (

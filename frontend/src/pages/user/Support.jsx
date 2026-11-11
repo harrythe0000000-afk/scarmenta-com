@@ -31,7 +31,7 @@ const NewTicket = ({ onCreated }) => {
       <p className="label-eyebrow">Open a ticket</p>
       <Input data-testid="ticket-subject-input" required minLength={3} placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="border-purple-500/20 bg-black/40" />
       <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-        <SelectTrigger data-testid="ticket-category-select" className="border-purple-500/20 bg-black/40"><SelectValue /></SelectTrigger>
+        <SelectTrigger data-testid="ticket-category-select" className="border-purple-500/20 bg-black/40 capitalize"><SelectValue /></SelectTrigger>
         <SelectContent>
           {["deposit", "wallet", "account", "technical", "other"].map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
         </SelectContent>

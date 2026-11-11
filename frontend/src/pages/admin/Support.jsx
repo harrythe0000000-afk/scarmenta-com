@@ -33,12 +33,12 @@ export default function AdminSupport() {
       <PageHeader eyebrow="Customer support" title="Ticket inbox" desc="Respond to player questions about deposits, wallets and accounts." />
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         <div>{data?.length ? <TicketList tickets={data} activeId={activeId} onSelect={setActiveId} /> : <EmptyState text="No tickets yet." testId="admin-tickets-empty" />}</div>
-        <div className="card-lux min-h-[400px] p-6">
+        <div className="card-lux flex min-h-[400px] flex-col p-6">
           {active ? (
             <>
               <div className="mb-4 flex justify-end">
                 <Select value={active.status} onValueChange={setStatus}>
-                  <SelectTrigger data-testid="admin-ticket-status-select" className="w-40 border-purple-500/20 bg-black/40"><SelectValue /></SelectTrigger>
+                  <SelectTrigger data-testid="admin-ticket-status-select" className="w-40 border-purple-500/20 bg-black/40 capitalize"><SelectValue /></SelectTrigger>
                   <SelectContent>{["open", "resolved", "closed"].map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>

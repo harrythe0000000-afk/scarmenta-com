@@ -1,0 +1,51 @@
+{
+  "summary": "First full run covering backend and frontend. Backend: 22/22 pytest tests pass (auth, cookies, refresh, bcrypt, CORS, lockout, role protection, deposits + 3-entry ledger on approval, reject, fraud high-value/velocity/resolve, admin users search/suspend/activate/adjust, settings + min<max validation, support tickets). Frontend: every requested flow works end to end: landing calculator and packages, register -> verify banner -> deposit blocked, demo dashboard (₹16,000 / ₹1,00,000), deposit dialog presets/methods -> toast -> pending row, statement type/wallet/date filters + CSV download + totals, user support ticket + reply, admin cockpit stats/charts, approve/reject with reason, users search/suspend/activate/adjust (negative over balance rejected), fraud resolve, admin ticket reply + status, fee sliders save + live preview, min>max error toast, /admin -> /app redirect for users, mobile layout. Fee settings restored to 20% / 5X.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login", "issue": "Lockout identifier uses the first X-Forwarded-For entry, which the client controls. Reproduced: 7 failed attempts, each with a different spoofed X-Forwarded-For header, all returned 401 and no lockout happened. Brute-force protection can be bypassed. Use the last proxy-appended IP, or also keep a per-email counter."},
+      {"endpoint": "POST /api/auth/login", "issue": "The 5th failed attempt returns 401. Only the 6th returns 429. The spec says '5 failed logins -> 429'. Acceptable, but the 5th response could return 429 directly."},
+      {"endpoint": "POST /api/admin/tickets/{id}/reply", "issue": "append_reply always sets status='open', including on admin replies. An admin reply to a resolved ticket reopens it. Consider an 'answered' status, or only reopen on user replies."},
+      {"endpoint": "PUT /api/admin/settings", "issue": "Packages are not checked against min/max deposit. A package outside the limits can be saved and then fails at purchase."},
+      {"endpoint": "POST /api/auth/refresh", "issue": "The refresh token is not rotated or revocable, and logout does not invalidate it server-side (it only clears cookies)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Ticket category / admin ticket status Select", "issue": "The selected value shows lowercase raw values ('deposit', 'resolved') while the options are capitalized ('Deposit', 'Resolved')", "selector": "[data-testid='ticket-category-select'], [data-testid='admin-ticket-status-select']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Statement / Admin transactions filters", "issues": ["The From/To date filters use the browser's native date picker (mm/dd/yyyy) instead of the shadcn Calendar/Popover"]},
+      {"screen": "Admin Support thread", "issues": ["The reply input row sticks out past the bottom border of the thread card (about 20px overflow)"]},
+      {"screen": "Toasts (top-right)", "issues": ["Toasts cover the page-header 'New deposit' / 'Save changes' buttons for several seconds after an action"]},
+      {"screen": "Statement totals", "issues": ["Credits total adds real-money and promo amounts together (e.g. ₹30,250 = ₹5,000 deposit + ₹25,000 promo + ₹250 adj) when 'Both wallets' is selected. This can mislead users; show per-wallet totals."]},
+      {"screen": "Admin Users", "issues": ["Suspend/Activate runs immediately with no confirmation dialog"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix lockout bypass via spoofed X-Forwarded-For (use a trusted proxy IP and/or add a per-email failure counter)",
+    "Optionally return 429 on the 5th failed attempt itself",
+    "Don't set ticket status back to 'open' on admin replies",
+    "Replace native date inputs with the shadcn Calendar date picker",
+    "Fix reply-bar overflow in the admin ticket thread card",
+    "Show capitalized labels in the Select triggers (category/status)",
+    "Validate that packages fall within min/max deposit in PUT /api/admin/settings"
+  ],
+  "critical_code_review_comments": [
+    "client_ip() trusts the first X-Forwarded-For entry, which lets attackers bypass lockout",
+    "Admin approve is atomic (find_one_and_update on status=pending) and a second approve returns 409. Good.",
+    "credit_deposit runs a separate insert_many after the balance $inc, so a crash between the two leaves the ledger out of sync with balances. Consider a Mongo transaction if a replica set is available.",
+    "Velocity count includes rejected deposits. Probably intended, but worth documenting.",
+    "DepositDialog adds an artificial 1.2s delay. Fine for a simulated gateway."
+  ],
+  "updated_files": ["/app/backend/tests/test_platform_api.py"],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% of requested flows functional; minor design issues only"},
+  "test_credentials": "admin@aetheria.io / Admin@12345, demo@aetheria.io / Demo@12345 (from /app/memory/test_credentials.md) - both work",
+  "seed_data_creation": "None persisted. All test_* users and their deposits/transactions/tickets/alerts/tokens were deleted by id after the tests. Demo balances are unchanged (₹16,000 / ₹1,00,000) and its pending ₹50,000 deposit was not touched. Settings restored to 20% / 5X. A non-test user 'rajukhatana28@gmail.com' registered during the run and was left as-is (not created by the tester).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the backend suite serially: `cd /app/backend && python -m pytest tests/test_platform_api.py -n 0`. The settings test temporarily changes the fee, so running in parallel races with deposit tests. The tests create verified users through mongo and clean up by id. Use throwaway emails for lockout tests.",
+  "rca of the issue": "Lockout bypass: server.py login() builds ident = f\"{client_ip(request)}:{email}\", and core.client_ip returns x-forwarded-for.split(',')[0], which the client sets. Repro: run curl 7 times with a different -H 'X-Forwarded-For: 1.2.3.N' each time; every response is 401 and no 429 appears. Mitigation: take the right-most IP appended by the ingress, or add an email-only failure counter."
+}
