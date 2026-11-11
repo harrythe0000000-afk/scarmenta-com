@@ -165,13 +165,13 @@ async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
     url = None
     if p.get("launch_url"):
         sep = "&" if "?" in p["launch_url"] else "?"
-        url = f"{p['launch_url']}{sep}token={token}&currency=INR&lang=en" + (f"&game={body.game_code}" if body.game_code else "")
+        url = f"{p['launch_url']}{sep}token={token}&currency=USD&lang=en" + (f"&game={body.game_code}" if body.game_code else "")
     return {"session_token": token, "launch_url": url, "provider": p["name"]}
 
 
 @router.get("/games/history")
 async def player_history(user: dict = Depends(get_current_user)):
-    return await db.game_transactions.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return await db.game_transactions.find({"user_id": user["id"], "status": "ok"}, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 # ---------- Provider seamless-wallet API ----------
@@ -199,9 +199,17 @@ async def _existing(provider: dict, tx_id: str) -> Optional[dict]:
     return await db.game_transactions.find_one({"provider_id": provider["id"], "external_tx_id": tx_id}, {"_id": 0})
 
 
+def _dup(gtx: dict) -> dict:
+    if gtx["status"] == "insufficient_funds":
+        raise HTTPException(status_code=402, detail="INSUFFICIENT_FUNDS")
+    if gtx["status"] == "processing":
+        raise HTTPException(status_code=409, detail="PROCESSING_RETRY_LATER")
+    return _reply(gtx, True)
+
+
 def _reply(gtx: dict, duplicate: bool = False) -> dict:
     return {"status": gtx["status"], "transaction_id": gtx["external_tx_id"], "balance": gtx.get("balance_after"),
-            "currency": "INR", "duplicate": duplicate}
+            "currency": "USD", "duplicate": duplicate}
 
 
 async def _record(provider: dict, user: dict, kind: str, tx_id: str, round_id: str, amount: float,
@@ -219,25 +227,25 @@ async def _finish(gtx: dict, user: dict, ledger_amount: float, desc: str) -> dic
     updated = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
     await db.game_transactions.update_one({"id": gtx["id"]}, {"$set": {"status": "ok", "balance_after": updated["promo_balance"]}})
     await db.transactions.insert_one(make_tx(updated, gtx["type"], "credit", ledger_amount, desc,
-                                             f"{gtx['provider_name']}:{gtx['round_id']}", updated["promo_balance"]))
+                                             gtx["round_id"], updated["promo_balance"]))
     return {**gtx, "status": "ok", "balance_after": updated["promo_balance"]}
 
 
 @router.post("/provider/v1/balance")
 async def pv_balance(body: SessionIn, provider: dict = Depends(get_provider)):
     _, user = await get_session_user(provider, body.session_token)
-    return {"status": "ok", "player_id": user["id"], "balance": user.get("promo_balance", 0), "currency": "INR"}
+    return {"status": "ok", "player_id": user["id"], "balance": user.get("promo_balance", 0), "currency": "USD"}
 
 
 @router.post("/provider/v1/bet")
 async def pv_bet(body: BetIn, provider: dict = Depends(get_provider)):
     _, user = await get_session_user(provider, body.session_token)
     if ex := await _existing(provider, body.transaction_id):
-        return _reply(ex, True)
+        return _dup(ex)
     try:
         gtx = await _record(provider, user, "bet", body.transaction_id, body.round_id, body.amount, body.game_code)
     except DuplicateKeyError:
-        return _reply(await _existing(provider, body.transaction_id), True)
+        return _dup(await _existing(provider, body.transaction_id))
     debited = await db.users.find_one_and_update({"id": user["id"], "promo_balance": {"$gte": body.amount}},
                                                  {"$inc": {"promo_balance": -round(body.amount, 2)}})
     if not debited:
@@ -252,14 +260,15 @@ async def pv_bet(body: BetIn, provider: dict = Depends(get_provider)):
 async def pv_win(body: WinIn, provider: dict = Depends(get_provider)):
     _, user = await get_session_user(provider, body.session_token)
     if ex := await _existing(provider, body.transaction_id):
-        return _reply(ex, True)
+        return _dup(ex)
     if not await db.game_transactions.find_one({"provider_id": provider["id"], "user_id": user["id"],
-                                                "round_id": body.round_id, "type": "bet", "status": "ok"}):
+                                                "round_id": body.round_id, "type": "bet", "status": "ok",
+                                                "rolled_back": {"$ne": True}}):
         raise HTTPException(status_code=400, detail="NO_BET_FOR_ROUND")
     try:
         gtx = await _record(provider, user, "win", body.transaction_id, body.round_id, body.amount, body.game_code)
     except DuplicateKeyError:
-        return _reply(await _existing(provider, body.transaction_id), True)
+        return _dup(await _existing(provider, body.transaction_id))
     if body.amount > 0:
         await db.users.update_one({"id": user["id"]}, {"$inc": {"promo_balance": round(body.amount, 2)}})
     gtx = await _finish(gtx, user, body.amount, f"Win · {provider['name']}" + (f" · {body.game_code}" if body.game_code else ""))
@@ -270,7 +279,7 @@ async def pv_win(body: WinIn, provider: dict = Depends(get_provider)):
 async def pv_rollback(body: RollbackIn, provider: dict = Depends(get_provider)):
     _, user = await get_session_user(provider, body.session_token)
     if ex := await _existing(provider, body.transaction_id):
-        return _reply(ex, True)
+        return _dup(ex)
     bet = await db.game_transactions.find_one_and_update(
         {"provider_id": provider["id"], "user_id": user["id"], "external_tx_id": body.ref_transaction_id,
          "type": "bet", "status": "ok", "rolled_back": {"$ne": True}},
@@ -282,7 +291,23 @@ async def pv_rollback(body: RollbackIn, provider: dict = Depends(get_provider)):
                             {"ref_transaction_id": body.ref_transaction_id})
     except DuplicateKeyError:
         await db.game_transactions.update_one({"id": bet["id"]}, {"$set": {"rolled_back": False}})
-        return _reply(await _existing(provider, body.transaction_id), True)
+        return _dup(await _existing(provider, body.transaction_id))
     await db.users.update_one({"id": user["id"]}, {"$inc": {"promo_balance": bet["amount"]}})
     gtx = await _finish(gtx, user, bet["amount"], f"Bet refund (rollback) · {provider['name']}")
     return _reply(gtx)
+
+
+SEED_PROVIDERS = [
+    ("Evolution", "evolution", "Live casino: roulette, blackjack, baccarat and game shows"),
+    ("Ezugi", "ezugi", "Live dealer tables: Teen Patti, Andar Bahar, roulette"),
+    ("Pragmatic Play", "pragmatic", "Slots and live casino"),
+]
+
+
+async def seed_providers() -> None:
+    for name, code, desc in SEED_PROVIDERS:
+        if not await db.providers.find_one({"code": code}):
+            key = "pk_" + secrets.token_urlsafe(32)
+            await db.providers.insert_one({"id": new_id(), "name": name, "code": code, "launch_url": None,
+                                           "description": desc, "status": "active", "api_key_hash": _hash(key),
+                                           "api_key_last4": key[-4:], "created_at": now_iso()})

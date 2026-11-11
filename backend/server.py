@@ -5,6 +5,7 @@ from core import (db, client, now, now_iso, new_id, clean, hash_password, verify
 from emailer import send_verification_email, send_reset_email
 import games
 import referrals
+import rewards
 
 import asyncio
 import logging
@@ -13,7 +14,7 @@ import re
 import secrets
 from contextlib import suppress
 from datetime import timedelta, timezone
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
@@ -45,6 +46,7 @@ INDEXES: dict[str, list[IndexModel]] = {
                           IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
                           IndexModel([("provider_id", ASCENDING), ("round_id", ASCENDING), ("user_id", ASCENDING)], name="round"),
                           IndexModel([("created_at", DESCENDING)], name="created_desc")],
+    "loss_reward_runs": [IndexModel([("period_end", DESCENDING)], name="period_end")],
     "login_attempts": [IndexModel([("identifier", ASCENDING)], name="identifier")],
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
@@ -63,7 +65,7 @@ async def ensure_indexes() -> None:
 app = FastAPI()
 api = APIRouter(prefix="/api")
 
-METHODS = Literal["upi", "netbanking", "card", "aed_wire", "usdt"]
+NETWORKS = {"TRC20": "usdt_trc20", "ERC20": "usdt_erc20", "BEP20": "usdt_bep20"}
 
 
 # ---------- Models ----------
@@ -95,7 +97,9 @@ class ResetIn(BaseModel):
 
 class DepositIn(BaseModel):
     amount: float = Field(gt=0)
-    method: METHODS
+    method: Literal["usdt", "upi"]
+    network: Optional[Literal["TRC20", "ERC20", "BEP20"]] = None
+    payment_reference: str = Field(min_length=6, max_length=120)
 
 
 class TicketIn(BaseModel):
@@ -132,7 +136,13 @@ class SettingsIn(BaseModel):
     fraud_amount_threshold: float = Field(gt=0)
     fraud_velocity_count: int = Field(ge=1, le=50)
     referral_bonus_percent: float = Field(ge=0, le=100)
+    loss_reward_percent: float = Field(ge=0, le=100)
     packages: List[float] = Field(min_length=1, max_length=8)
+    fx_rates: Dict[str, float] = Field(default_factory=dict)
+    upi_id: str = Field(default="", max_length=100)
+    usdt_trc20: str = Field(default="", max_length=120)
+    usdt_erc20: str = Field(default="", max_length=120)
+    usdt_bep20: str = Field(default="", max_length=120)
 
 
 # ---------- Helpers ----------
@@ -141,7 +151,8 @@ async def credit_deposit(dep: dict) -> None:
         {"id": dep["user_id"]},
         {"$inc": {"promo_balance": dep["promo_credit"]}},
         projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-    desc = f"₹{dep['amount']:,.0f} deposit via {dep['method'].upper()} · {dep['promo_multiplier']:g}X credit allocation"
+    via = f"USDT {dep.get('network') or ''}".strip() if dep["method"] == "usdt" else "UPI"
+    desc = f"${dep['amount']:,.2f} deposit via {via} · {dep['promo_multiplier']:g}X credit allocation"
     await db.transactions.insert_one(make_tx(user, "deposit", "credit", dep["promo_credit"], desc, dep["reference"],
                                              user["promo_balance"]))
 
@@ -294,7 +305,11 @@ async def reset_password(body: ResetIn):
 @api.get("/public/config")
 async def public_config():
     s = await get_settings()
-    return {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages")}
+    out = {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages", "fx_rates",
+                             "referral_bonus_percent", "loss_reward_percent")}
+    out["currency"] = "USD"
+    out["payment"] = {"upi_id": s["upi_id"], "usdt": {n: s[k] for n, k in NETWORKS.items()}}
+    return out
 
 
 # ---------- User ----------
@@ -307,7 +322,8 @@ async def wallet(user: dict = Depends(get_current_user)):
     totals = agg[0] if agg else {"deposited": 0, "credits": 0, "count": 0}
     pending = await db.deposits.count_documents({"user_id": user["id"], "status": "pending"})
     return {"balance": user.get("promo_balance", 0), "total_deposited": totals["deposited"],
-            "total_credits": totals["credits"], "approved_count": totals["count"], "pending_count": pending}
+            "total_credits": totals["credits"], "approved_count": totals["count"], "pending_count": pending,
+            "referral_earnings": user.get("referral_earnings", 0), "loss_rewards": user.get("loss_rewards_total", 0)}
 
 
 @api.post("/deposits")
@@ -318,7 +334,23 @@ async def create_deposit(body: DepositIn, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=403, detail="Please verify your email before making a deposit")
     s = await get_settings()
     if body.amount < s["min_deposit"] or body.amount > s["max_deposit"]:
-        raise HTTPException(status_code=400, detail=f"Deposit must be between ₹{s['min_deposit']:,.0f} and ₹{s['max_deposit']:,.0f}")
+        raise HTTPException(status_code=400, detail=f"Deposit must be between ${s['min_deposit']:,.0f} and ${s['max_deposit']:,.0f}")
+    if body.method == "usdt":
+        if not body.network:
+            raise HTTPException(status_code=400, detail="Choose a USDT network")
+        if not s[NETWORKS[body.network]]:
+            raise HTTPException(status_code=400, detail=f"USDT {body.network} deposits are not available yet")
+        local = {"network": body.network, "pay_to": s[NETWORKS[body.network]], "local_currency": "USDT",
+                 "fx_rate": 1.0, "local_amount": round(body.amount, 2)}
+    else:
+        rate = s["fx_rates"].get("INR")
+        if not s["upi_id"] or not rate:
+            raise HTTPException(status_code=400, detail="UPI deposits are not available yet")
+        local = {"network": None, "pay_to": s["upi_id"], "local_currency": "INR", "fx_rate": rate,
+                 "local_amount": round(body.amount * rate, 2)}
+    ref = body.payment_reference.strip()
+    if await db.deposits.find_one({"payment_reference": ref, "status": {"$ne": "rejected"}}):
+        raise HTTPException(status_code=400, detail="This payment reference has already been submitted")
     since = (now() - timedelta(hours=24)).isoformat()
     recent = await db.deposits.count_documents({"user_id": user["id"], "created_at": {"$gte": since}})
     flags = []
@@ -327,12 +359,13 @@ async def create_deposit(body: DepositIn, user: dict = Depends(get_current_user)
     if recent + 1 >= s["fraud_velocity_count"]:
         flags.append("velocity")
     dep = {"id": new_id(), "reference": f"DEP-{secrets.token_hex(4).upper()}", "user_id": user["id"],
-           "user_email": user["email"], "user_name": user["name"], "amount": round(body.amount, 2), "currency": "INR",
-           "method": body.method, **compute_breakdown(body.amount, s), "status": "pending", "fraud_flags": flags,
+           "user_email": user["email"], "user_name": user["name"], "amount": round(body.amount, 2), "currency": "USD",
+           "method": body.method, **local, "payment_reference": ref, **compute_breakdown(body.amount, s),
+           "status": "pending", "fraud_flags": flags,
            "risk_score": min(100, 12 + 38 * len(flags)), "created_at": now_iso()}
     await db.deposits.insert_one(dep)
     if "high_amount" in flags:
-        await add_alert("high_amount", "high", f"Deposit {dep['reference']} of ₹{body.amount:,.0f} exceeds threshold", user, dep["reference"])
+        await add_alert("high_amount", "high", f"Deposit {dep['reference']} of ${body.amount:,.2f} exceeds threshold", user, dep["reference"])
     if "velocity" in flags:
         await add_alert("velocity", "medium", f"{recent + 1} deposits in 24h by {user['email']}", user, dep["reference"])
     return clean(dep)
@@ -517,7 +550,15 @@ async def admin_put_settings(body: SettingsIn, admin: dict = Depends(require_adm
         raise HTTPException(status_code=400, detail="Minimum deposit must be lower than maximum")
     if any(p < body.min_deposit or p > body.max_deposit for p in body.packages):
         raise HTTPException(status_code=400, detail="Every package must be within the min/max deposit limits")
+    rates = {}
+    for code, rate in body.fx_rates.items():
+        c = code.strip().upper()
+        if not re.fullmatch(r"[A-Z]{3,5}", c) or rate <= 0:
+            raise HTTPException(status_code=400, detail=f"Invalid currency rate: {code}")
+        rates[c] = round(rate, 6)
     data = body.model_dump()
+    data["fx_rates"] = rates
+    data.update({k: data[k].strip() for k in ("upi_id", "usdt_trc20", "usdt_erc20", "usdt_bep20")})
     data["packages"] = sorted({round(p, 2) for p in body.packages if p > 0})
     data.update({"updated_at": now_iso(), "updated_by": admin["email"]})
     await db.settings.update_one({"key": "platform"}, {"$set": data}, upsert=True)
@@ -568,6 +609,7 @@ async def seed() -> None:
                                    "password_hash": hash_password(os.environ["ADMIN_PASSWORD"]), "role": "admin",
                                    "status": "active", "email_verified": True,
                                    "promo_balance": 0.0, "created_at": now_iso()})
+    await games.seed_providers()
     demo_email = os.environ["DEMO_EMAIL"].lower()
     if not await db.users.find_one({"email": demo_email}):
         demo = {"id": new_id(), "email": demo_email, "name": "Demo Player", "country": "India",
@@ -576,10 +618,12 @@ async def seed() -> None:
                 "created_at": now_iso()}
         await db.users.insert_one(demo)
         s = await get_settings()
-        for amount, status in ((20000.0, "approved"), (50000.0, "pending")):
+        for amount, status in ((200.0, "approved"), (500.0, "pending")):
             dep = {"id": new_id(), "reference": f"DEP-{secrets.token_hex(4).upper()}", "user_id": demo["id"],
-                   "user_email": demo_email, "user_name": demo["name"], "amount": amount, "currency": "INR",
-                   "method": "upi", **compute_breakdown(amount, s), "status": status, "fraud_flags": [],
+                   "user_email": demo_email, "user_name": demo["name"], "amount": amount, "currency": "USD",
+                   "method": "usdt", "network": "TRC20", "pay_to": "demo-seed", "local_currency": "USDT",
+                   "fx_rate": 1.0, "local_amount": amount, "payment_reference": f"DEMO-SEED-{secrets.token_hex(4)}",
+                   **compute_breakdown(amount, s), "status": status, "fraud_flags": [],
                    "risk_score": 12, "created_at": now_iso()}
             if status == "approved":
                 dep.update({"reviewed_at": now_iso(), "reviewed_by": admin_email})
@@ -591,6 +635,7 @@ async def seed() -> None:
 app.include_router(api)
 app.include_router(referrals.router)
 app.include_router(games.router)
+app.include_router(rewards.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[FRONTEND_URL],
                    allow_methods=["*"], allow_headers=["*"])
 

@@ -6,7 +6,7 @@ import { DepositDialog } from "@/components/DepositDialog";
 import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useConfig, useFetch } from "@/lib/hooks";
-import { fmtDate, inr, methodLabel } from "@/lib/format";
+import { fmtDate, usd, methodLabel, localMoney } from "@/lib/format";
 
 export default function UserDeposits() {
   const config = useConfig();
@@ -23,7 +23,7 @@ export default function UserDeposits() {
           <Table>
             <TableHeader>
               <TableRow className="border-white/5 hover:bg-transparent">
-                {["Reference", "Date", "Method", "Cash paid", "Credits", "Status"].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
+                {["Reference", "Date", "Method", "You paid", "Amount", "Credits", "Payment ref.", "Status"].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -31,9 +31,11 @@ export default function UserDeposits() {
                 <TableRow key={d.id} className="border-white/5 hover:bg-purple-500/[0.04]" data-testid={`deposit-row-${d.reference}`}>
                   <TableCell className="font-num text-xs text-purple-300">{d.reference}</TableCell>
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(d.created_at)}</TableCell>
-                  <TableCell className="text-xs text-slate-300">{methodLabel(d.method)}</TableCell>
-                  <TableCell className="font-num text-sm font-semibold text-white">{inr(d.amount)}</TableCell>
-                  <TableCell className="font-num text-sm font-semibold text-purple-300">{inr(d.promo_credit)}</TableCell>
+                  <TableCell className="text-xs text-slate-300">{methodLabel(d.method, d.network)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{localMoney(d.local_amount, d.local_currency)}</TableCell>
+                  <TableCell className="font-num text-sm font-semibold text-white">{usd(d.amount)}</TableCell>
+                  <TableCell className="font-num text-sm font-semibold text-purple-300">{usd(d.promo_credit)}</TableCell>
+                  <TableCell className="max-w-[140px] truncate font-num text-[11px] text-slate-500" title={d.payment_reference}>{d.payment_reference}</TableCell>
                   <TableCell>
                     <StatusBadge status={d.status} testId={`deposit-status-${d.reference}`} />
                     {d.reject_reason && <p className="mt-1 text-[11px] text-red-300/80">{d.reject_reason}</p>}

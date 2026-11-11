@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TX_TYPES, fmtDate, inr, signedInr } from "@/lib/format";
+import { TX_TYPES, fmtDate, usd, signedUsd } from "@/lib/format";
 import { EmptyState } from "@/components/StatCard";
 
 export const TxTable = ({ rows, showUser = false, testId = "tx-table" }) => {
@@ -27,9 +27,9 @@ export const TxTable = ({ rows, showUser = false, testId = "tx-table" }) => {
                 {t.description} <span className="font-num text-purple-300/70">· {t.reference}</span>
               </TableCell>
               <TableCell className={`text-right font-num text-sm font-semibold ${t.amount < 0 ? "text-red-300" : "text-emerald-300"}`}>
-                {signedInr(t.amount)}
+                {signedUsd(t.amount)}
               </TableCell>
-              <TableCell className="text-right font-num text-xs text-slate-400">{inr(t.balance_after)}</TableCell>
+              <TableCell className="text-right font-num text-xs text-slate-400">{usd(t.balance_after)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

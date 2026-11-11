@@ -12,6 +12,8 @@ const STYLES = {
   medium: "bg-amber-500/10 text-amber-300 border-amber-500/30",
   low: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   verified: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  earning: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  inactive: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   unverified: "bg-amber-500/10 text-amber-300 border-amber-500/30",
 };
 

@@ -1,7 +1,12 @@
-export const inr = (n) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+export const usd = (n) =>
+  `${Number(n) < 0 ? "-" : ""}$${Math.abs(Number(n || 0)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export const signedInr = (n) => `${n < 0 ? "−" : "+"}${inr(Math.abs(n))}`;
+export const localMoney = (n, cur) =>
+  cur === "INR"
+    ? `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+    : `${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${cur || ""}`.trim();
+
+export const signedUsd = (n) => `${n < 0 ? "−" : "+"}${usd(Math.abs(n))}`;
 
 export const fmtDate = (iso) =>
   iso
@@ -13,21 +18,19 @@ export const calc = (amount, cfg) => ({
 });
 
 export const METHODS = [
-  { value: "upi", label: "UPI", hint: "Instant · India" },
-  { value: "netbanking", label: "NetBanking", hint: "All major banks" },
-  { value: "card", label: "Credit / Debit Card", hint: "Visa · Mastercard" },
-  { value: "aed_wire", label: "AED Bank Wire", hint: "UAE · GCC" },
-  { value: "usdt", label: "USDT", hint: "TRC-20 / ERC-20" },
+  { value: "usdt", label: "USDT", hint: "All countries · TRC20 / ERC20 / BEP20" },
+  { value: "upi", label: "UPI", hint: "India · paid in INR at today's rate" },
 ];
 
-export const methodLabel = (v) => METHODS.find((m) => m.value === v)?.label || v;
+export const methodLabel = (v, network) => (v === "usdt" ? `USDT${network ? ` ${network}` : ""}` : METHODS.find((m) => m.value === v)?.label || v);
 
 export const TX_TYPES = {
   deposit: "Credit Allocation",
   bet: "Bet",
   win: "Win",
   rollback: "Bet Refund",
-  referral_bonus: "Referral Bonus",
+  referral_bonus: "Referral Income",
+  loss_reward: "Loss Reward",
   admin_adjustment: "Adjustment",
 };
 

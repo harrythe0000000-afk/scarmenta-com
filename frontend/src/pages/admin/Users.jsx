@@ -9,7 +9,7 @@ import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
-import { fmtDate, inr } from "@/lib/format";
+import { fmtDate, usd } from "@/lib/format";
 
 const AdjustDialog = ({ user, onClose, onDone }) => {
   const [form, setForm] = useState({ amount: "", reason: "" });
@@ -71,7 +71,7 @@ export default function AdminUsers() {
           <Table>
             <TableHeader>
               <TableRow className="border-white/5 hover:bg-transparent">
-                {["User", "Role", "Email", "Credit balance", "Joined", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
+                {["User", "Role", "Email", "Credit balance", "Referral income", "Loss rewards", "Joined", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -80,7 +80,9 @@ export default function AdminUsers() {
                   <TableCell><p className="text-sm text-white">{u.name}</p><p className="text-xs text-slate-500">{u.email}</p></TableCell>
                   <TableCell className="text-xs uppercase tracking-wider text-slate-400">{u.role}</TableCell>
                   <TableCell><StatusBadge status={u.email_verified ? "verified" : "unverified"} /></TableCell>
-                  <TableCell className="font-num text-sm text-purple-300">{inr(u.promo_balance)}</TableCell>
+                  <TableCell className="font-num text-sm text-purple-300">{usd(u.promo_balance)}</TableCell>
+                  <TableCell className="font-num text-sm text-emerald-300">{usd(u.referral_earnings)}</TableCell>
+                  <TableCell className="font-num text-sm text-amber-300">{usd(u.loss_rewards_total)}</TableCell>
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(u.created_at)}</TableCell>
                   <TableCell><StatusBadge status={u.status} testId={`admin-user-status-${u.email}`} /></TableCell>
                   <TableCell>

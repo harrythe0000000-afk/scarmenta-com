@@ -1,0 +1,48 @@
+{
+  "summary": "Tested Refer & Earn, logout, game providers (admin), the games lobby (player), the seamless wallet API, Game Activity, and regression. Backend: extended /app/backend/tests/test_platform_api.py to 31 tests; 30 pass and 1 fails because of one real bug. Passing coverage: invalid referral code returns 400; 10% referral bonus as one 'referral_bonus' ledger entry; no bonus on the second deposit; 0% pays nothing; referral_bonus_percent above 100 returns 422; logout for user and admin; provider create, duplicate code, http URL, bad code, edit, 404s, rotate-key; inactive provider is hidden and gets 401 on the wallet API; launch URL with token and currency=INR; admin launch returns 403. Wallet API: bet, win and rollback are idempotent (duplicate:true). INSUFFICIENT_FUNDS returns 402 and leaves the balance unchanged. NO_BET_FOR_ROUND returns 400. A second rollback returns 404. Expired or bogus sessions and cross-provider tokens return 401. A suspended player gets 403. Ledger types and GGR math are correct. A concurrency check (8 parallel bets on a balance covering 5) gave exactly 5 ok and 3 402s, and parallel same-transaction_id bets debited once. UI (Playwright, 1920x1080) worked end to end: /app/refer code, link and WhatsApp; ?ref prefill; inline 'Invalid referral code' error; a real referee of demo registered in the UI earned demo ₹1,000 once, shown on /app/refer and /admin/referrals (Rewarded tab); logout for both roles redirects to /login, /auth/me returns 401, and protected routes redirect. Providers UI: add, key dialog (pk_…), duplicate and http toasts, edit, rotate (last4 updates), integration guide. Games lobby: Coming soon vs Live; Play toast; the launch_url popup opens url?token…&currency=INR. Statement shows Bet / Win / Bet Refund. Game Activity totals, provider table, search and type filter work. Settings referral bonus save and restore works.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/games/history", "issue": "Returns every game_transaction, including status 'insufficient_funds' and 'processing'. The spec says failed bets must be hidden from the player. Fix: add the filter {'status': 'ok'} (or exclude 'insufficient_funds'). The UI then shows e.g. 'Bet (insufficient funds) −₹9,99,99,999' in red, which looks like a real debit. Covered by TestProviders::test_wallet_flow, the only failing test."},
+      {"endpoint": "POST /api/provider/v1/bet (retry of a failed bet)", "issue": "If a provider retries a transaction_id that previously got 402, it receives HTTP 200 with status 'insufficient_funds' and duplicate:true, not 402 again. A concurrent duplicate that arrives while the first call is still 'processing' gets status 'processing' with balance null. Consider returning 402 for a stored insufficient_funds, and a retryable 409 for processing."},
+      {"endpoint": "POST /api/provider/v1/win", "issue": "A win is still accepted for a round whose only bet was rolled back (the check uses status 'ok' only and ignores rolled_back). Consider also requiring rolled_back != true."},
+      {"endpoint": "referrals.reward_referrer", "issue": "When referral_bonus_percent is 0, the referee is still marked referral_rewarded=true with a ₹0 reward. Re-enabling the bonus later will never pay for that referee, and the row shows 'rewarded' with ₹0. This may be intended; flag it to the product owner."},
+      {"endpoint": "POST /api/auth/logout", "issue": "Stateless: it only clears cookies. A copied access token (Bearer) stays valid until its 15-minute expiry, and the refresh token for 7 days. Acceptable for an MVP."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Games.jsx game history", "issue": "Shows failed bets (insufficient funds) with the full attempted amount as a red debit. Hide them (backend filter) or at least don't render the amount as a deduction.", "selector": "[data-testid='game-history-table']", "priority": "MEDIUM"},
+      {"component": "Refer.jsx / admin Referrals.jsx status badge", "issue": "A rewarded referral shows the badge text 'APPROVED' because status 'rewarded' is mapped to 'approved'. The spec expects 'rewarded'. Add a 'rewarded' style to StatusBadge and pass r.status directly.", "selector": "[data-testid='referrals-table'], [data-testid^='admin-referral-row-']", "priority": "LOW"},
+      {"component": "Providers.jsx status badge", "issue": "An inactive provider is rendered as 'CLOSED' (it maps to the closed style). Should read 'Inactive'.", "selector": "[data-testid^='provider-status-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Game Activity provider table", "issues": ["A negative GGR is formatted as '₹-500'. Use a signed format like '−₹500'."]},
+      {"screen": "Statement (game rows)", "issues": ["The description repeats the provider name: 'Bet · TEST_UI x · TEST_UI x:UIRS', because the reference is 'ProviderName:round'. Use just the round_id as the reference."]},
+      {"screen": "Admin Providers", "issues": ["Rotate key fires immediately with no confirmation, which instantly breaks a live provider integration. Add a confirm dialog."]},
+      {"screen": "Statement filters", "issues": ["Still uses the browser's native date input instead of a shadcn Calendar (carried over from iteration 2)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Filter /api/games/history to status 'ok' so failed bets are hidden from players (fixes the failing TestProviders::test_wallet_flow)",
+    "Show 'Rewarded' instead of 'Approved' on the referral status badges (user and admin)",
+    "Optional: on a bet retry of a stored insufficient_funds, return 402; block wins on rounds whose bet was rolled back; label inactive providers 'Inactive'; add a rotate-key confirmation; format negative GGR",
+    "Demo account data was changed by the main agent's earlier manual curl test on 'Sandbox Provider' (bets/win/rollback on demo, balance now ₹1,00,500 instead of the seeded ₹1,00,000, plus a 99,999,999 insufficient_funds bet in demo's game history). Clean it up or reseed if a pristine demo is wanted."
+  ],
+  "critical_code_review_comments": [
+    "games.py: bet debit is race-safe (find_one_and_update with promo_balance $gte), and the unique index (provider_id, external_tx_id) gives idempotency. Verified with parallel requests.",
+    "games.py: _record inserts 'processing', then the balance changes, then _finish runs. These are not one atomic transaction, so a crash between steps leaves the balance changed with the tx stuck in 'processing' and no ledger entry. Consider a reconciliation job or Mongo transactions.",
+    "games.py launch: game_code is appended to the launch URL without URL-encoding (use urllib.parse.urlencode).",
+    "games.py get_provider: the hmac.compare_digest after the hash lookup is redundant (the DB lookup already matched the hash). Harmless.",
+    "Frontend: the served webpack bundle was stale. It still rendered the Refer & Earn settings card twice, from a prior edit, with duplicate testid 'settings-referral-bonus'. Touching Settings.jsx recompiled it to the correct single card. No code change needed, but the main agent should confirm visually."
+  ],
+  "updated_files": ["/app/backend/tests/test_platform_api.py"],
+  "success_rate": {"backend": "97% (30/31; 1 failure = failed bets visible in player history)", "frontend": "~92% of requested flows pass; issues are the history visibility and badge labels"},
+  "seed_data_creation": "None kept. Throwaway TEST_ users, providers (t*/tuia*/tuib*), sessions and game txs were deleted by id. The UI referral test on demo added +₹1,000 and one referral_bonus tx (ref DEP-46A84792); both were reverted, and the referee user and its deposits deleted. Settings restored to 5X / 10%. The Sandbox Provider was not touched (not rotated).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Referral tests live inside TestDeposits so that settings changes don't race under xdist loadscope. test_demo_wallet now checks the balance against the latest ledger balance_after, because demo carries main-agent sandbox game activity. The failed-bet visibility assertion is the last line of test_wallet_flow, so all other wallet checks run first. The register form needs register-agree-checkbox checked. The Game Activity type filter is a shadcn Select with options 'Bets'/'Wins'/'Refunds'. Clipboard copy shows 'Could not copy' in headless; that is expected.",
+  "rca of the issue": "Failed bets visible: player_history in games.py queries game_transactions by user_id only, with no status filter, and Games.jsx renders every row with signedInr(-amount)."
+}

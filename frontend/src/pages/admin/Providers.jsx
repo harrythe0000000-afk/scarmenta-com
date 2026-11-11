@@ -74,7 +74,7 @@ const IntegrationGuide = () => (
     <p className="label-eyebrow">How the integration works</p>
     <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-slate-400">
       <li>Add a provider here and share its wallet API key with the provider.</li>
-      <li>When a player taps Play, we create a 4-hour session token and open <span className="font-num text-purple-300">launch_url?token=…&currency=INR</span>.</li>
+      <li>When a player taps Play, we create a 4-hour session token and open <span className="font-num text-purple-300">launch_url?token=…&currency=USD</span>.</li>
       <li>The provider calls the wallet API below with header <span className="font-num text-purple-300">X-Provider-Key</span>. Every call is idempotent on <span className="font-num">transaction_id</span>.</li>
       <li>Every bet, win and refund is written to the player's ledger and appears in Game Activity.</li>
     </ol>
@@ -122,11 +122,11 @@ export default function AdminProviders() {
                   <p className="font-num text-xs text-purple-300">{p.code} · key …{p.api_key_last4}</p>
                   <p className="mt-1 truncate text-xs text-slate-500">{p.launch_url || "Launch URL not set — shows as Coming soon"}</p>
                 </div>
-                <StatusBadge status={p.status === "active" ? "active" : "closed"} testId={`provider-status-${p.code}`} />
+                <StatusBadge status={p.status} testId={`provider-status-${p.code}`} />
               </div>
               <div className="mt-4 flex gap-2">
                 <Button size="sm" variant="outline" data-testid={`provider-edit-btn-${p.code}`} onClick={() => setEditing(p)} className="rounded-full border-purple-500/30 bg-transparent hover:bg-purple-500/10"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
-                <Button size="sm" variant="outline" data-testid={`provider-rotate-btn-${p.code}`} onClick={() => rotate(p)} className="rounded-full border-amber-500/30 bg-transparent text-amber-200 hover:bg-amber-500/10"><KeyRound className="mr-1.5 h-3.5 w-3.5" /> Rotate key</Button>
+                <Button size="sm" variant="outline" data-testid={`provider-rotate-btn-${p.code}`} onClick={() => window.confirm(`Rotate the key for ${p.name}? The old key stops working immediately.`) && rotate(p)} className="rounded-full border-amber-500/30 bg-transparent text-amber-200 hover:bg-amber-500/10"><KeyRound className="mr-1.5 h-3.5 w-3.5" /> Rotate key</Button>
               </div>
             </div>
           ))}

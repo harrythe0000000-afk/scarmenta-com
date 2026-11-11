@@ -3,10 +3,10 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import { Banknote, Clock, LifeBuoy, ShieldAlert, Sparkles, Users, Wallet } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/StatCard";
 import { useFetch } from "@/lib/hooks";
-import { inr } from "@/lib/format";
+import { usd } from "@/lib/format";
 
 const tooltipStyle = { background: "#0d0a1a", border: "1px solid rgba(139,92,246,.3)", borderRadius: 12, fontSize: 12 };
-const short = (v) => (v >= 100000 ? `${(v / 100000).toFixed(1)}L` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v);
+const short = (v) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v);
 
 export default function AdminOverview() {
   const { data: s } = useFetch("/admin/stats");
@@ -15,9 +15,9 @@ export default function AdminOverview() {
     <>
       <PageHeader eyebrow="Admin cockpit" title="Financial overview" desc="Platform-wide cash deposits, credit allocations and outstanding balances." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Cash deposits" value={inr(s?.total_deposits)} icon={Banknote} tone="emerald" testId="admin-stat-deposits" sub={`${s?.approved_count ?? 0} approved`} />
-        <StatCard label="Credits issued" value={inr(s?.total_credits)} icon={Sparkles} testId="admin-stat-credits" className="d-1" />
-        <StatCard label="Outstanding credits" value={inr(s?.credit_outstanding)} icon={Wallet} tone="amber" testId="admin-stat-outstanding" className="d-2" />
+        <StatCard label="Cash deposits" value={usd(s?.total_deposits)} icon={Banknote} tone="emerald" testId="admin-stat-deposits" sub={`${s?.approved_count ?? 0} approved`} />
+        <StatCard label="Credits issued" value={usd(s?.total_credits)} icon={Sparkles} testId="admin-stat-credits" className="d-1" />
+        <StatCard label="Outstanding credits" value={usd(s?.credit_outstanding)} icon={Wallet} tone="amber" testId="admin-stat-outstanding" className="d-2" />
         <StatCard label="Pending approvals" value={s?.pending_count ?? 0} icon={Clock} tone="red" testId="admin-stat-pending" className="d-3" />
         <StatCard label="Players" value={s?.users_count ?? 0} icon={Users} testId="admin-stat-users" sub={`${s?.verified_users ?? 0} verified`} />
         <StatCard label="Open fraud alerts" value={s?.open_alerts ?? 0} icon={ShieldAlert} tone="red" testId="admin-stat-alerts" />
@@ -38,7 +38,7 @@ export default function AdminOverview() {
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} interval={4} />
                 <YAxis tickFormatter={short} tickLine={false} axisLine={false} width={44} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => inr(v)} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => usd(v)} />
                 <Area type="monotone" dataKey="credits" name="Credits issued" stroke="#A855F7" fill="url(#gP)" strokeWidth={2} />
                 <Area type="monotone" dataKey="deposits" name="Cash deposits" stroke="#10B981" fill="url(#gD)" strokeWidth={2} />
               </AreaChart>
@@ -54,7 +54,7 @@ export default function AdminOverview() {
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} interval={6} />
                 <YAxis tickFormatter={short} tickLine={false} axisLine={false} width={40} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => inr(v)} cursor={{ fill: "rgba(139,92,246,.08)" }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => usd(v)} cursor={{ fill: "rgba(139,92,246,.08)" }} />
                 <Bar dataKey="deposits" name="Cash deposits" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

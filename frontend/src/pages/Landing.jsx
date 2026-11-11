@@ -6,7 +6,7 @@ import { CreditCalculator } from "@/components/CreditCalculator";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useConfig } from "@/lib/hooks";
-import { calc, inr } from "@/lib/format";
+import { calc, usd } from "@/lib/format";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1689443111130-6e9c7dfd8f9e?crop=entropy&cs=srgb&fm=jpg&q=85&w=2000";
 
@@ -44,7 +44,7 @@ const NavBar = () => {
 };
 
 const Hero = ({ config }) => {
-  const [amount, setAmount] = useState(20000);
+  const [amount, setAmount] = useState(200);
   return (
     <section className="relative overflow-hidden grain">
       <img src={HERO_IMG} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
@@ -58,7 +58,7 @@ const Hero = ({ config }) => {
           </div>
           <h1 className="fade-up d-1 mt-7 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Prepaid gaming credit,<br />
-            <span className="text-gradient">accounted to the rupee.</span>
+            <span className="text-gradient">accounted to the cent.</span>
           </h1>
           <p className="fade-up d-2 mt-6 max-w-xl text-base text-slate-400 sm:text-lg">
             Aetheria is the technology layer that manages prepaid credit packages, 5X credit allocation and revenue
@@ -94,9 +94,9 @@ const Hero = ({ config }) => {
 };
 
 const STEPS = [
-  { icon: Wallet, title: "Deposit", text: "Purchase a prepaid package via UPI, NetBanking, card, AED wire or USDT." },
+  { icon: Wallet, title: "Deposit", text: "Buy a prepaid package in USDT from any country, or by UPI in India." },
   { icon: ShieldCheck, title: "Review", text: "Each deposit is checked by our compliance team before credits are issued." },
-  { icon: Sparkles, title: "5X credits", text: "Your balance is credited at 5X the cash deposited — no service fees." },
+  { icon: Sparkles, title: "5X credits", text: "Your main balance is credited with 5X your deposit, in USD, with no service fees." },
   { icon: Receipt, title: "Ledger", text: "Every allocation is recorded on your downloadable account statement." },
 ];
 
@@ -132,12 +132,12 @@ const Packages = ({ config }) => (
             <div key={p} data-testid={`landing-package-${p}`} className={`card-lux p-6 hover:-translate-y-1 ${featured ? "border-purple-500/60 glow-violet" : ""}`}>
               {featured && <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">Most chosen</span>}
               <p className="text-xs uppercase tracking-widest text-slate-500">You pay</p>
-              <p className="mt-1 font-num text-2xl font-semibold text-white">{inr(p)}</p>
+              <p className="mt-1 font-num text-2xl font-semibold text-white">{usd(p)}</p>
               <div className="my-5 h-px bg-white/5" />
               <p className="text-xs text-slate-500">Credit balance</p>
-              <p className="font-num text-lg font-semibold text-purple-300">{inr(b.credits)}</p>
+              <p className="font-num text-lg font-semibold text-purple-300">{usd(b.credits)}</p>
               <p className="mt-3 text-xs text-slate-500">Service fee</p>
-              <p className="font-num text-sm text-emerald-300">₹0</p>
+              <p className="font-num text-sm text-emerald-300">$0</p>
             </div>
           );
         })}
@@ -149,7 +149,7 @@ const Packages = ({ config }) => (
 const TRUST = [
   { icon: Building2, title: "Cyprus-registered entity", text: "Operated from an EU jurisdiction with documented governance." },
   { icon: Scale, title: "Transparent accounting", text: "Every deposit and credit allocation is an immutable ledger line." },
-  { icon: Lock, title: "Encrypted & audited", text: "Every rupee deposited and every credit issued is traceable." },
+  { icon: Lock, title: "Encrypted & audited", text: "Every dollar deposited and every credit issued is traceable." },
   { icon: Globe2, title: "Authorized markets only", text: "Gaming activity is restricted to legally authorized jurisdictions." },
 ];
 

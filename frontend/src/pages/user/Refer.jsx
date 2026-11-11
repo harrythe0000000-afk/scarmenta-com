@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader, StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useFetch } from "@/lib/hooks";
-import { fmtDate, inr } from "@/lib/format";
+import { fmtDate, usd } from "@/lib/format";
 
 const copy = async (text, label) => {
   try {
@@ -22,7 +22,7 @@ export default function UserRefer() {
   const msg = `Join me on Aetheria and get 5X credits on your deposit. Use my code ${r.code}: ${r.link}`;
   return (
     <>
-      <PageHeader eyebrow="Refer & earn" title="Invite friends, earn credits" desc={`Earn ${r.bonus_percent}% of your friend's first approved deposit as bonus credits.`} />
+      <PageHeader eyebrow="Refer & earn" title="Invite friends, earn credits" desc={`Earn ${r.bonus_percent}% referral income on every deposit your friends make, added straight to your balance.`} />
       <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         <div className="relative overflow-hidden rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/40 to-[#05040A] p-8 glow-violet fade-up" data-testid="referral-code-card">
           <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-fuchsia-500/20 blur-3xl" />
@@ -40,7 +40,7 @@ export default function UserRefer() {
         </div>
         <div className="grid gap-4">
           <StatCard label="Friends referred" value={r.total_referred} icon={Users} testId="referral-stat-count" />
-          <StatCard label="Credits earned" value={inr(r.total_earned)} icon={Gift} tone="emerald" testId="referral-stat-earned" />
+          <StatCard label="Credits earned" value={usd(r.total_earned)} icon={Gift} tone="emerald" testId="referral-stat-earned" />
         </div>
       </div>
       <section className="mt-10">
@@ -54,8 +54,8 @@ export default function UserRefer() {
                   <TableRow key={i} className="border-white/5">
                     <TableCell className="text-sm text-white">{x.name}</TableCell>
                     <TableCell className="font-num text-xs text-slate-400">{fmtDate(x.joined_at)}</TableCell>
-                    <TableCell><StatusBadge status={x.status === "rewarded" ? "approved" : "pending"} /></TableCell>
-                    <TableCell className="font-num text-sm text-emerald-300">{inr(x.reward)}</TableCell>
+                    <TableCell><StatusBadge status={x.status} /></TableCell>
+                    <TableCell className="font-num text-sm text-emerald-300">{usd(x.reward)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

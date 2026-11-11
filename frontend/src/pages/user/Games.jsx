@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, PageHeader } from "@/components/StatCard";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
-import { TX_TYPES, fmtDate, inr, signedInr } from "@/lib/format";
+import { TX_TYPES, fmtDate, usd, signedUsd } from "@/lib/format";
 
 const ProviderCard = ({ p }) => {
   const [busy, setBusy] = useState(false);
@@ -67,8 +67,8 @@ export default function UserGames() {
                     <TableCell className="text-xs text-slate-300">{g.provider_name}</TableCell>
                     <TableCell className="font-num text-xs text-purple-300">{g.round_id}</TableCell>
                     <TableCell className="text-xs text-slate-200">{TX_TYPES[g.type] || g.type}{g.status !== "ok" && <span className="ml-1 text-red-300">({g.status.replace("_", " ")})</span>}</TableCell>
-                    <TableCell className={`font-num text-sm ${g.type === "bet" ? "text-red-300" : "text-emerald-300"}`}>{signedInr(g.type === "bet" ? -g.amount : g.amount)}</TableCell>
-                    <TableCell className="font-num text-xs text-slate-400">{inr(g.balance_after)}</TableCell>
+                    <TableCell className={`font-num text-sm ${g.type === "bet" ? "text-red-300" : "text-emerald-300"}`}>{signedUsd(g.type === "bet" ? -g.amount : g.amount)}</TableCell>
+                    <TableCell className="font-num text-xs text-slate-400">{usd(g.balance_after)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

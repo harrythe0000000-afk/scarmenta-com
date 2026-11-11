@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { calc, inr } from "@/lib/format";
+import { calc, usd } from "@/lib/format";
 import { ArrowDown, Sparkles } from "lucide-react";
 
 export const CreditCalculator = ({ config, amount, onChange, testPrefix = "calc" }) => {
@@ -8,10 +8,10 @@ export const CreditCalculator = ({ config, amount, onChange, testPrefix = "calc"
   return (
     <div className="space-y-3">
       <label className="label-eyebrow" htmlFor={`${testPrefix}-amount`}>
-        Package amount (INR)
+        Package amount (USD)
       </label>
       <div className="relative">
-        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-num text-xl text-purple-300">₹</span>
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-num text-xl text-purple-300">$</span>
         <Input
           id={`${testPrefix}-amount`}
           data-testid={`${testPrefix}-amount-input`}
@@ -31,7 +31,7 @@ export const CreditCalculator = ({ config, amount, onChange, testPrefix = "calc"
           Your credit balance ({mult}X)
         </span>
         <span className="font-num text-2xl font-bold text-white" data-testid={`${testPrefix}-credits`}>
-          {inr(b.credits)}
+          {usd(b.credits)}
         </span>
       </div>
       <p className="text-center text-[11px] text-slate-500">No service fees · Credits are non-withdrawable</p>

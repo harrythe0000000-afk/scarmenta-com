@@ -5,26 +5,30 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { CreditCalculator } from "@/components/CreditCalculator";
 import { api, formatApiError } from "@/lib/api";
-import { METHODS, inr } from "@/lib/format";
+import { METHODS, usd } from "@/lib/format";
+import { PaymentInstructions, paymentAvailable } from "@/components/PaymentInstructions";
 
 export const DepositDialog = ({ open, onOpenChange, config, presetAmount, onDone }) => {
-  const [amount, setAmount] = useState(20000);
-  const [method, setMethod] = useState("upi");
+  const [amount, setAmount] = useState(200);
+  const [method, setMethod] = useState("usdt");
+  const [network, setNetwork] = useState("TRC20");
+  const [reference, setReference] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setAmount(presetAmount || 20000);
+      setAmount(presetAmount || 200);
+      setReference("");
       setBusy(false);
     }
   }, [open, presetAmount]);
 
   const submit = async () => {
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 1200));
     try {
-      const { data } = await api.post("/deposits", { amount: Number(amount), method });
-      toast.success(`Deposit ${data.reference} submitted`, { description: "Awaiting compliance approval before credits are allocated." });
+      const body = { amount: Number(amount), method, payment_reference: reference.trim(), network: method === "usdt" ? network : null };
+      const { data } = await api.post("/deposits", body);
+      toast.success(`Deposit ${data.reference} submitted`, { description: "We'll verify your payment and add the credits once it's approved." });
       onOpenChange(false);
       onDone?.();
     } catch (e) {
@@ -38,9 +42,9 @@ export const DepositDialog = ({ open, onOpenChange, config, presetAmount, onDone
     <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
       <DialogContent data-testid="deposit-dialog" className="max-h-[92vh] overflow-y-auto border-purple-500/30 bg-[#0b0817] sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl text-white">Purchase credit package</DialogTitle>
+          <DialogTitle className="font-display text-2xl text-white">Buy a credit package</DialogTitle>
           <DialogDescription className="text-slate-400">
-            Simulated payment gateway — no real money moves. Deposits are reviewed before allocation.
+            Pay with USDT (any country) or UPI (India). Enter your payment reference and we'll add the credits once it's verified.
           </DialogDescription>
         </DialogHeader>
         {config && (
@@ -55,7 +59,7 @@ export const DepositDialog = ({ open, onOpenChange, config, presetAmount, onDone
                   Number(amount) === p ? "border-purple-400 bg-purple-500/20 text-white" : "border-white/10 text-slate-400 hover:border-purple-500/40"
                 }`}
               >
-                {inr(p)}
+                {usd(p)}
               </button>
             ))}
           </div>
@@ -80,24 +84,25 @@ export const DepositDialog = ({ open, onOpenChange, config, presetAmount, onDone
             ))}
           </div>
         </div>
+        <PaymentInstructions config={config} method={method} network={network} setNetwork={setNetwork} amount={amount} reference={reference} setReference={setReference} />
         {config && (
           <p className="text-[11px] text-slate-500">
-            Limits: {inr(config.min_deposit)} – {inr(config.max_deposit)} per deposit. Prepaid credits are non-refundable and cannot be withdrawn.
+            Limits: {usd(config.min_deposit)} – {usd(config.max_deposit)} per deposit. Prepaid credits are non-refundable and cannot be withdrawn.
           </p>
         )}
         <Button
           data-testid="deposit-submit-button"
-          disabled={busy || !Number(amount)}
+          disabled={busy || !Number(amount) || reference.trim().length < 6 || !paymentAvailable(config, method, network)}
           onClick={submit}
           className="h-12 w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-base font-semibold hover:from-violet-500 hover:to-fuchsia-500"
         >
           {busy ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing via gateway…
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…
             </>
           ) : (
             <>
-              <ShieldCheck className="mr-2 h-4 w-4" /> Pay {inr(amount)}
+              <ShieldCheck className="mr-2 h-4 w-4" /> I've paid {usd(amount)}, submit
             </>
           )}
         </Button>

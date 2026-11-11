@@ -20,12 +20,19 @@ JWT_ALGORITHM = "HS256"
 
 DEFAULT_SETTINGS = {
     "promo_multiplier": 5.0,
-    "min_deposit": 1000.0,
-    "max_deposit": 500000.0,
-    "fraud_amount_threshold": 100000.0,
+    "min_deposit": 10.0,
+    "max_deposit": 10000.0,
+    "fraud_amount_threshold": 2000.0,
     "fraud_velocity_count": 3,
     "referral_bonus_percent": 10.0,
-    "packages": [5000.0, 10000.0, 20000.0, 50000.0, 100000.0],
+    "loss_reward_percent": 5.0,
+    "packages": [50.0, 100.0, 250.0, 500.0, 1000.0],
+    "fx_rates": {"INR": 95.0, "AED": 3.67, "PKR": 280.0, "BDT": 120.0, "NPR": 152.0, "LKR": 300.0,
+                 "SAR": 3.75, "QAR": 3.64, "KWD": 0.31, "OMR": 0.385, "BHD": 0.376},
+    "upi_id": "",
+    "usdt_trc20": "",
+    "usdt_erc20": "",
+    "usdt_bep20": "",
 }
 
 

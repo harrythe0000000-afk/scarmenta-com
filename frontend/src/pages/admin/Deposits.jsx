@@ -10,7 +10,7 @@ import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
-import { fmtDate, inr, methodLabel } from "@/lib/format";
+import { fmtDate, usd, methodLabel, localMoney } from "@/lib/format";
 
 const Risk = ({ score, flags }) => {
   const tone = score >= 50 ? "text-red-300 bg-red-500/10" : score >= 30 ? "text-amber-300 bg-amber-500/10" : "text-emerald-300 bg-emerald-500/10";
@@ -66,7 +66,7 @@ export default function AdminDeposits() {
           <Table>
             <TableHeader>
               <TableRow className="border-white/5 hover:bg-transparent">
-                {["Reference", "Player", "Date", "Method", "Cash paid", "Credits", "Risk", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
+                {["Reference", "Player", "Date", "Method / payment ref.", "Received", "Amount", "Credits", "Risk", "Status", ""].map((h) => <TableHead key={h} className="text-slate-500">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -75,9 +75,13 @@ export default function AdminDeposits() {
                   <TableCell className="font-num text-xs text-purple-300">{d.reference}</TableCell>
                   <TableCell><p className="text-sm text-white">{d.user_name}</p><p className="text-xs text-slate-500">{d.user_email}</p></TableCell>
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(d.created_at)}</TableCell>
-                  <TableCell className="text-xs text-slate-300">{methodLabel(d.method)}</TableCell>
-                  <TableCell className="font-num text-sm font-semibold text-white">{inr(d.amount)}</TableCell>
-                  <TableCell className="whitespace-nowrap font-num text-sm text-purple-300">{inr(d.promo_credit)}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <p className="text-xs text-slate-300">{methodLabel(d.method, d.network)}</p>
+                    <p className="truncate font-num text-[11px] text-purple-300/80" title={d.payment_reference} data-testid={`admin-deposit-ref-${d.reference}`}>{d.payment_reference}</p>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap font-num text-xs text-slate-300">{localMoney(d.local_amount, d.local_currency)}{d.local_currency === "INR" && <p className="text-[10px] text-slate-500">@ ₹{d.fx_rate}/$</p>}</TableCell>
+                  <TableCell className="font-num text-sm font-semibold text-white">{usd(d.amount)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-num text-sm text-purple-300">{usd(d.promo_credit)}</TableCell>
                   <TableCell><Risk score={d.risk_score} flags={d.fraud_flags} /></TableCell>
                   <TableCell><StatusBadge status={d.status} /></TableCell>
                   <TableCell>

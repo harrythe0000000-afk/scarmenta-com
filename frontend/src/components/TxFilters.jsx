@@ -3,7 +3,7 @@ import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TX_TYPES, downloadCSV, inr } from "@/lib/format";
+import { TX_TYPES, downloadCSV, usd } from "@/lib/format";
 
 export const TxFilters = ({ filters, setFilters, extra }) => {
   const set = (k) => (v) => setFilters({ ...filters, [k]: v });
@@ -40,7 +40,7 @@ export const buildQuery = (base, filters) => {
 
 export const exportTx = (rows, name) =>
   downloadCSV(name, [
-    ["Date", "User", "Type", "Description", "Reference", "Credits (INR)", "Balance after (INR)"],
+    ["Date", "User", "Type", "Description", "Reference", "Credits (USD)", "Balance after (USD)"],
     ...rows.map((t) => [t.created_at, t.user_email, TX_TYPES[t.type] || t.type, t.description, t.reference, t.amount, t.balance_after]),
   ]);
 
@@ -65,7 +65,7 @@ export const StatementActions = ({ rows, name }) => (
 export const TotalsBar = ({ totals, count }) => (
   <div className="mb-5 flex flex-wrap gap-6 text-sm" data-testid="statement-totals">
     <span className="text-slate-400">Entries: <b className="font-num text-white">{count}</b></span>
-    <span className="text-slate-400">Credited: <b className="font-num text-emerald-300">{inr(totals.credits)}</b></span>
-    <span className="text-slate-400">Debited: <b className="font-num text-red-300">{inr(Math.abs(totals.debits))}</b></span>
+    <span className="text-slate-400">Credited: <b className="font-num text-emerald-300">{usd(totals.credits)}</b></span>
+    <span className="text-slate-400">Debited: <b className="font-num text-red-300">{usd(Math.abs(totals.debits))}</b></span>
   </div>
 );
