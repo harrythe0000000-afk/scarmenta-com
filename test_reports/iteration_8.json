@@ -1,0 +1,29 @@
+{
+  "summary": "Tested the new /admin/login page, the admin route guards, the links to the admin login, the player login regression and the site_url origin whitelist for email/referral links. Backend 15/15 pytest pass. Frontend: all requested flows pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verified": [
+    "Logged out: /admin, /admin/deposits, /admin/settings, /admin/staff all redirect to /admin/login",
+    "Owner admin login -> /admin with full nav incl. Staff + Credit Config; owner visiting /admin/login -> /admin",
+    "Staff login -> /admin Staff Console with no Credit Config nav; /admin/settings -> /admin; staff visiting /admin/login -> /admin",
+    "Player on admin login -> 'doesn't have admin access' error; /api/auth/me 401 afterwards",
+    "Wrong password -> 'Invalid email or password'",
+    "Links: footer-admin-login-link, login-to-admin-link -> /admin/login; admin-login-to-player-link -> /login",
+    "Player /login password mode -> /app; OTP toggle renders; player /admin -> /app",
+    "site_url: Origin scarmenta.com / www.scarmenta.com is used in the referral link; evil origin and no origin fall back to FRONTEND_URL; forgot-password returns 200 for both; unit test of core.site_url passes",
+    "CORS reflects only whitelisted origins, with credentials=true",
+    "db.users role=admin count == 1; admin hash is $2b$"
+  ],
+  "test_report_links": ["/app/backend/tests/test_admin_login_site_url.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "A logged-in player visiting /admin/login sees the form (not redirected). Acceptable, since it allows switching to an admin account, but it could show a 'signed in as player' hint.",
+    "AdminLogin with player credentials briefly sets session cookies before calling logout. Works, but a server-side admin-only login flag would be cleaner."
+  ],
+  "updated_files": ["/app/backend/tests/test_admin_login_site_url.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. No credentials changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest without -p no:xdist (pytest.ini uses xdist). test_admin_login_site_url.py covers the admin login and origin whitelist."
+}
