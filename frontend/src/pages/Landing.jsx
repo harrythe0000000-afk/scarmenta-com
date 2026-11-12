@@ -52,12 +52,7 @@ const Hero = ({ config }) => {
       <div className="absolute inset-0 bg-gradient-to-r from-[#05040A] via-[#05040A]/90 to-[#05040A]/60" />
       <div className="relative z-10 mx-auto grid max-w-7xl gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[1.15fr_1fr] lg:py-28">
         <div className="flex flex-col justify-center">
-          <div className="fade-up flex flex-wrap gap-2">
-            {["Cyprus HQ", "South Asia", "Middle East"].map((m) => (
-              <span key={m} className="rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-200">{m}</span>
-            ))}
-          </div>
-          <h1 className="fade-up d-1 mt-7 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <h1 className="fade-up d-1 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Play bigger with a<br />
             <span className="text-gradient">5X gaming balance.</span>
           </h1>
@@ -148,7 +143,7 @@ const Packages = ({ config }) => (
 );
 
 const TRUST = [
-  { icon: Building2, title: "Cyprus-registered entity", text: "Operated from an EU jurisdiction with documented governance." },
+  { icon: Building2, title: "Registered business entity", text: "Operated with documented governance and clear policies." },
   { icon: Scale, title: "Transparent accounting", text: "Every deposit and credit allocation is an immutable ledger line." },
   { icon: Lock, title: "Encrypted & audited", text: "Every dollar deposited and every credit issued is traceable." },
   { icon: Globe2, title: "Authorized markets only", text: "Gaming activity is restricted to legally authorized jurisdictions." },
@@ -192,7 +187,7 @@ export default function Landing() {
           <div className="flex items-center gap-6">
             <BrandLogo testId="footer-logo-link" />
           </div>
-          <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} Scarmenta Ltd, Limassol, Cyprus.</p>
+          <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} Scarmenta Ltd.</p>
         </div>
       </footer>
     </div>

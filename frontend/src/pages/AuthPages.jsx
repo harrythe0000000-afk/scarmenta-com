@@ -27,7 +27,7 @@ const AuthLayout = ({ title, subtitle, children, footer }) => (
           </p>
           <p className="mt-4 max-w-md text-slate-400">Every cash deposit and credit allocation, tracked line by line.</p>
         </div>
-        <p className="text-xs text-slate-600">Limassol, Cyprus · Serving South Asia & Middle East</p>
+        <p className="text-xs text-slate-600">Technology. Transparency. Trust.</p>
       </div>
     </div>
     <div className="flex items-center justify-center px-5 py-12">

@@ -12,7 +12,7 @@ export default function UserStatement() {
   const totals = useTotals(data);
   return (
     <>
-      <PageHeader eyebrow="Account statement" title="Transaction ledger" desc={`${user?.name} · ${user?.email} · Issued by Scarmenta Ltd, Cyprus`}
+      <PageHeader eyebrow="Account statement" title="Transaction ledger" desc={`${user?.name} · ${user?.email} · Issued by Scarmenta Ltd`}
         action={<StatementActions rows={data} name={`scarmenta-statement-${new Date().toISOString().slice(0, 10)}.csv`} />} />
       <TxFilters filters={filters} setFilters={setFilters} />
       <TotalsBar totals={totals} count={data?.length || 0} />
