@@ -33,12 +33,16 @@ export const UserPopups = () => {
     }).catch(() => {});
   }, []);
   const current = queue[0];
+  useEffect(() => {
+    if (current) api.post(`/banners/${current.id}/event`, { type: "view" }).catch(() => {});
+  }, [current]);
   const close = () => {
     sessionStorage.setItem(POPUP_SEEN_KEY, JSON.stringify([...seen(), current.id]));
     setQueue((q) => q.slice(1));
   };
   const go = () => {
     const url = current.button_url;
+    api.post(`/banners/${current.id}/event`, { type: "click" }).catch(() => {});
     close();
     if (url.startsWith("/")) navigate(url);
     else window.open(url, "_blank", "noopener");

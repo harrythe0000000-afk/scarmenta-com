@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 import io
@@ -63,6 +64,12 @@ class BannerIn(BaseModel):
     image_id: Optional[str] = None
     audience: List[Audience] = Field(min_length=1)
     active: bool = True
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+
+
+class BannerEventIn(BaseModel):
+    type: Literal["view", "click"]
 
 
 class BannerPatch(BaseModel):
@@ -71,7 +78,15 @@ class BannerPatch(BaseModel):
 
 def banner_out(b: dict) -> dict:
     return {k: b.get(k) for k in ("id", "title", "text", "button_label", "button_url", "image_id",
-                                  "audience", "active", "created_at")}
+                                  "audience", "active", "starts_at", "ends_at", "created_at", "views", "clicks")}
+
+
+def utc_iso(d: Optional[datetime]) -> Optional[str]:
+    if d is None:
+        return None
+    if d.tzinfo is None:
+        raise HTTPException(status_code=400, detail="Schedule time must include a time zone")
+    return d.astimezone(timezone.utc).isoformat()
 
 
 @router.post("/admin/banners/image")
@@ -114,7 +129,12 @@ async def banner_image(fid: str):
 @router.get("/admin/banners")
 async def list_banners(admin: dict = Depends(require_admin)):
     docs = await db.banners.find({"deleted": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).to_list(200)
-    return [banner_out(b) for b in docs]
+    stats = await db.banner_events.aggregate([
+        {"$match": {"banner_id": {"$in": [b["id"] for b in docs]}}},
+        {"$group": {"_id": {"b": "$banner_id", "t": "$type"}, "n": {"$sum": 1}}}]).to_list(1000)
+    counts = {(x["_id"]["b"], x["_id"]["t"]): x["n"] for x in stats}
+    return [banner_out({**b, "views": counts.get((b["id"], "view"), 0), "clicks": counts.get((b["id"], "click"), 0)})
+            for b in docs]
 
 
 @router.post("/admin/banners")
@@ -126,7 +146,13 @@ async def create_banner(body: BannerIn, admin: dict = Depends(require_admin)):
     url = body.button_url or ""
     if url and not (url.startswith(("https://", "http://")) or (url.startswith("/") and not url.startswith(("//", "/\\")))):
         raise HTTPException(status_code=400, detail="Button link must start with https:// or /")
-    doc = {"id": new_id(), **body.model_dump(), "audience": sorted(set(body.audience)),
+    starts, ends = utc_iso(body.starts_at), utc_iso(body.ends_at)
+    if starts and ends and ends <= starts:
+        raise HTTPException(status_code=400, detail="End time must be after start time")
+    if ends and ends <= now_iso():
+        raise HTTPException(status_code=400, detail="End time is already in the past")
+    doc = {"id": new_id(), **body.model_dump(), "starts_at": starts, "ends_at": ends,
+           "audience": sorted(set(body.audience)),
            "created_by": admin["email"], "created_at": now_iso(), "deleted": False}
     await db.banners.insert_one(dict(doc))
     return banner_out(doc)
@@ -152,9 +178,21 @@ async def delete_banner(bid: str, admin: dict = Depends(require_admin)):
 async def active_banners(user: dict = Depends(get_current_user)):
     if user["role"] not in ("user", "agent"):
         return []
-    docs = await db.banners.find({"active": True, "deleted": {"$ne": True}, "audience": user["role"]},
+    ts = now_iso()
+    docs = await db.banners.find({"active": True, "deleted": {"$ne": True}, "audience": user["role"],
+                                  "$and": [{"$or": [{"starts_at": None}, {"starts_at": {"$lte": ts}}]},
+                                           {"$or": [{"ends_at": None}, {"ends_at": {"$gt": ts}}]}]},
                                  {"_id": 0}).sort("created_at", -1).to_list(20)
     return [banner_out(b) for b in docs]
+
+
+@router.post("/banners/{bid}/event")
+async def banner_event(bid: str, body: BannerEventIn, user: dict = Depends(get_current_user)):
+    if not await db.banners.find_one({"id": bid, "deleted": {"$ne": True}, "audience": user["role"]}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Popup not found")
+    key = {"banner_id": bid, "user_id": user["id"], "type": body.type}
+    await db.banner_events.update_one(key, {"$setOnInsert": {**key, "created_at": now_iso()}}, upsert=True)
+    return {"ok": True}
 
 
 # ---------- Terms re-acceptance ----------

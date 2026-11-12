@@ -14,7 +14,16 @@ import { useFetch } from "@/lib/hooks";
 import { fmtDate } from "@/lib/format";
 
 const AUD = [["user", "Players"], ["agent", "Agents"]];
-const EMPTY = { title: "", text: "", button_label: "", button_url: "", image_id: null, audience: ["user"] };
+const EMPTY = { title: "", text: "", button_label: "", button_url: "", image_id: null, audience: ["user"], starts_at: "", ends_at: "" };
+const toIst = (v) => (v ? `${v}:00+05:30` : null);
+const fmtIst = (iso) => new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const phase = (b) => {
+  const now = new Date().toISOString();
+  if (!b.active) return ["Off", "text-slate-500"];
+  if (b.starts_at && b.starts_at > now) return ["Scheduled", "text-sky-300"];
+  if (b.ends_at && b.ends_at <= now) return ["Ended", "text-slate-500"];
+  return ["Live", "text-emerald-300"];
+};
 const inputCls = "border-purple-500/20 bg-black/40";
 
 const ImagePicker = ({ imageId, onChange }) => {
@@ -59,7 +68,7 @@ const NewPopup = ({ onDone }) => {
     if (!f.audience.length) return toast.error("Choose who should see this popup");
     setBusy(true);
     try {
-      await api.post("/admin/banners", { ...f, button_label: f.button_label || null, button_url: f.button_url || null });
+      await api.post("/admin/banners", { ...f, button_label: f.button_label || null, button_url: f.button_url || null, starts_at: toIst(f.starts_at), ends_at: toIst(f.ends_at) });
       toast.success("Popup published");
       setF(EMPTY);
       onDone();
@@ -79,6 +88,15 @@ const NewPopup = ({ onDone }) => {
         <Input data-testid="popup-button-label-input" placeholder="Button text (optional)" value={f.button_label} onChange={set("button_label")} className={inputCls} />
         <Input data-testid="popup-button-url-input" placeholder="/app/deposits or https://…" value={f.button_url} onChange={set("button_url")} className={inputCls} />
       </div>
+      <div className="grid grid-cols-2 gap-2" data-testid="popup-schedule">
+        <label className="space-y-1 text-xs text-slate-400">Start (IST, optional)
+          <Input type="datetime-local" data-testid="popup-start-input" value={f.starts_at} onChange={set("starts_at")} className={inputCls} />
+        </label>
+        <label className="space-y-1 text-xs text-slate-400">End (IST, optional)
+          <Input type="datetime-local" data-testid="popup-end-input" value={f.ends_at} min={f.starts_at || undefined} onChange={set("ends_at")} className={inputCls} />
+        </label>
+      </div>
+      <p className="text-xs text-slate-500">Leave empty to show right away and keep it on until you turn it off.</p>
       <div className="flex gap-4 text-sm" data-testid="popup-audience">
         <span className="text-slate-400">Show to:</span>
         {AUD.map(([v, l]) => (
@@ -119,10 +137,19 @@ const PopupRow = ({ b, reload }) => {
         <p className="truncate font-semibold text-white">{b.title}</p>
         <p className="truncate text-xs text-slate-400">{b.text}</p>
         <p className="mt-1 text-xs text-slate-500">{b.audience.map((a) => (a === "user" ? "Players" : "Agents")).join(" + ")} · {fmtDate(b.created_at)}</p>
+        {(b.starts_at || b.ends_at) && (
+          <p className="mt-1 text-xs text-slate-400" data-testid={`popup-schedule-${b.id}`}>
+            {b.starts_at ? fmtIst(b.starts_at) : "Now"} → {b.ends_at ? fmtIst(b.ends_at) : "No end"} IST
+          </p>
+        )}
+        <div className="mt-2 flex gap-4 text-xs" data-testid={`popup-stats-${b.id}`}>
+          <span className="text-slate-300"><span className="font-num text-white" data-testid={`popup-views-${b.id}`}>{b.views}</span> saw it</span>
+          {b.button_label && <span className="text-slate-300"><span className="font-num text-white" data-testid={`popup-clicks-${b.id}`}>{b.clicks}</span> tapped button{b.views ? ` (${Math.round((b.clicks / b.views) * 100)}%)` : ""}</span>}
+        </div>
       </div>
       <div className="flex flex-col items-end gap-2">
         <label className="flex items-center gap-2 text-xs text-slate-400">
-          {b.active ? "Live" : "Off"}
+          <span className={phase(b)[1]} data-testid={`popup-phase-${b.id}`}>{phase(b)[0]}</span>
           <Switch checked={b.active} data-testid={`popup-toggle-${b.id}`}
             onCheckedChange={(v) => act(() => api.patch(`/admin/banners/${b.id}`, { active: v }), v ? "Popup is live" : "Popup turned off")} />
         </label>

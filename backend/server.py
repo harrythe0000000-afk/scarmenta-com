@@ -60,6 +60,8 @@ INDEXES: dict[str, list[IndexModel]] = {
     "login_attempts": [IndexModel([("identifier", ASCENDING)], name="identifier")],
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
+    "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
+                                 name="banner_user_type", unique=True)],
 }
 
 
