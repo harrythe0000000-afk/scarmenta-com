@@ -78,7 +78,7 @@ const SharerBoard = () => {
           {data.me ? (
             <>
               <p className="mt-3 font-num text-4xl font-bold text-white" data-testid="sharers-my-position">#{data.me.rank}</p>
-              <p className="mt-1 text-sm text-slate-400"><span className="font-num text-white">{data.me.friends}</span> friends joined from your images</p>
+              <p className="mt-1 text-sm text-slate-400"><span className="font-num text-white">{data.me.friends}</span> {data.me.friends === 1 ? "friend" : "friends"} joined from your images</p>
             </>
           ) : <p className="mt-3 text-sm text-slate-400" data-testid="sharers-not-ranked">Share your calculator result to get on the board.</p>}
           <Link to="/app/calculator" data-testid="sharers-go-calculator" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-black hover:bg-[#1ebe5b]">

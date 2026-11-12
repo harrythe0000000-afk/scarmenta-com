@@ -5,6 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
 from core import (client_ip, now, db, site_url, get_current_user, get_settings, make_tx, new_id, now_iso,
                   require_admin, require_staff, unique_referral_code)
@@ -162,27 +163,38 @@ async def admin_sharers(_: dict = Depends(require_admin)):
 async def reward_sharers(body: SharerRewardIn, admin: dict = Depends(require_admin)):
     if any(a < 0 or a > 10000 for a in body.amounts) or not any(a > 0 for a in body.amounts):
         raise HTTPException(status_code=400, detail="Enter bonus amounts between $0 and $10,000")
-    last = await db.sharer_reward_runs.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
-    if last and last["created_at"] > (now() - timedelta(days=7)).isoformat():
-        raise HTTPException(status_code=400, detail="Top sharers were already rewarded in the last 7 days")
-    since, ranked = await _top_sharers()
-    if not ranked:
-        raise HTTPException(status_code=400, detail="No sharers to reward this week")
-    run_id, winners = new_id(), []
-    for r, amt in zip(ranked, body.amounts):
-        amt = round(amt, 2)
-        if amt <= 0:
-            continue
-        u = await db.users.find_one_and_update({"id": r["user_id"]}, {"$inc": {"promo_balance": amt}},
-                                               projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-        if not u:
-            continue
-        await db.transactions.insert_one(make_tx(u, "sharer_reward", "credit", amt,
-                                                 f"Top sharer #{r['rank']} this week ({r['friends']} friends joined)",
-                                                 run_id, u["promo_balance"]))
-        winners.append({"rank": r["rank"], "user_id": u["id"], "name": u["name"], "email": u["email"],
-                        "friends": r["friends"], "amount": amt})
-    run = {"id": run_id, "period_start": since, "period_end": now_iso(), "winners": winners,
-           "total": round(sum(w["amount"] for w in winners), 2), "created_by": admin["email"], "created_at": now_iso()}
-    await db.sharer_reward_runs.insert_one(dict(run))
-    return run
+    try:
+        await db.locks.insert_one({"_id": "sharer_reward", "at": now_iso()})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="A reward is already being sent. Please wait.")
+    try:
+        last = await db.sharer_reward_runs.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
+        if last and last["created_at"] > (now() - timedelta(days=7)).isoformat():
+            raise HTTPException(status_code=400, detail="Top sharers were already rewarded in the last 7 days")
+        since, ranked = await _top_sharers()
+        if not ranked:
+            raise HTTPException(status_code=400, detail="No sharers to reward this week")
+        if not any(a > 0 for a in body.amounts[:len(ranked)]):
+            raise HTTPException(status_code=400, detail="Enter an amount for at least one ranked sharer")
+        run_id, winners = new_id(), []
+        for r, amt in zip(ranked, body.amounts):
+            amt = round(amt, 2)
+            if amt <= 0:
+                continue
+            u = await db.users.find_one_and_update({"id": r["user_id"]}, {"$inc": {"promo_balance": amt}},
+                                                   projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+            if not u:
+                continue
+            await db.transactions.insert_one(make_tx(u, "sharer_reward", "credit", amt,
+                                                     f"Top sharer #{r['rank']} this week ({r['friends']} friends joined)",
+                                                     run_id, u["promo_balance"]))
+            winners.append({"rank": r["rank"], "user_id": u["id"], "name": u["name"], "email": u["email"],
+                            "friends": r["friends"], "amount": amt})
+        if not winners:
+            raise HTTPException(status_code=400, detail="No one was paid. Enter an amount for at least one ranked sharer")
+        run = {"id": run_id, "period_start": since, "period_end": now_iso(), "winners": winners,
+               "total": round(sum(w["amount"] for w in winners), 2), "created_by": admin["email"], "created_at": now_iso()}
+        await db.sharer_reward_runs.insert_one(dict(run))
+        return run
+    finally:
+        await db.locks.delete_one({"_id": "sharer_reward"})

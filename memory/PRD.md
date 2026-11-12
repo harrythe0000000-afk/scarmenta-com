@@ -89,3 +89,8 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## 2026-11-12 Weekly loss leaderboard
 - /app/leaderboard (players only): top 10 by net game loss (bets - wins - rollbacks) over rolling last 7 days, global, masked names (De***o), own rank + estimated loss reward; GET /api/leaderboard/weekly in rewards.py
 - Removed Cyprus / South Asia / Middle East mentions from landing, auth, statement
+
+## 2026-11-12 Top sharers leaderboard
+- Player Leaderboard tabs: Top losses / Top sharers (friends signed up via calc share link, rolling 7 days, masked)
+- Admin /admin/top-sharers (admin only): full table, reward top 3 (default 25/15/10) -> promo_balance + tx sharer_reward; 7-day cooldown; db.locks guard against double pay
+- Tests: iteration_16.json pass

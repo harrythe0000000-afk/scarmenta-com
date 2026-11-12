@@ -10,7 +10,9 @@ import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { fmtDate, usd } from "@/lib/format";
 
-const RewardBox = ({ top, onDone }) => {
+const RewardBox = ({ top, lastRun, onDone }) => {
+  const next = lastRun ? new Date(new Date(lastRun.created_at).getTime() + 7 * 864e5) : null;
+  const locked = next && next > new Date();
   const [amounts, setAmounts] = useState(["25", "15", "10"]);
   const winners = top.slice(0, 3);
   const pay = async () => {
@@ -36,9 +38,10 @@ const RewardBox = ({ top, onDone }) => {
           </div>
         </div>
       ))}
+      {locked && <p className="text-xs text-amber-300" data-testid="sharers-next-reward">Next reward available on {fmtDate(next.toISOString())}</p>}
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button disabled={!winners.length} data-testid="sharers-reward-button" className="w-full rounded-full bg-purple-600 hover:bg-purple-500"><Gift className="mr-2 h-4 w-4" /> Send bonus credits</Button>
+          <Button disabled={!winners.length || locked} data-testid="sharers-reward-button" className="w-full rounded-full bg-purple-600 hover:bg-purple-500"><Gift className="mr-2 h-4 w-4" /> Send bonus credits</Button>
         </AlertDialogTrigger>
         <AlertDialogContent className="border-purple-500/20 bg-[#0b0816] text-slate-200">
           <AlertDialogHeader>
@@ -91,7 +94,7 @@ export default function TopSharers() {
             )}
           </div>
           <div className="space-y-6">
-            <RewardBox top={data.top} onDone={reload} />
+            <RewardBox top={data.top} lastRun={data.runs[0]} onDone={reload} />
             <Runs runs={data.runs} />
           </div>
         </div>

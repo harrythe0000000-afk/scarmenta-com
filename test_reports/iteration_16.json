@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the weekly Top Sharers leaderboard and admin top-3 reward, backend and frontend. Backend: new pytest suite /app/backend/tests/test_top_sharers.py, 11/11 passed. It covers ranking (most friends first, ties go to the earliest signup), masked names, is_me/me, rejecting normal ?ref= signups without src, rejecting signups older than 7 days, rejecting referrers whose role is not user, 401 when logged out, 403 for staff and players on admin endpoints, amount validation (negative, all zero, >10000 -> 400; empty list or 4 items -> 422), reward rules (a $0 rank is skipped, promo_balance goes up, a sharer_reward tx is created with reference=run id, the run is listed, the demo player at rank 4 is not paid) and the 7-day cooldown (400). Frontend: player Top losses/Top sharers tabs (rows, values like '3 friends', masked 'De***o' with a YOU badge, my-position #4 for demo, not-ranked state, Share now link goes to /app/calculator). Admin /admin/top-sharers: full name/email table, defaults 25/15/10, confirm dialog, toast 'Paid $35.00 to 2 top sharers', run shows in Past rewards, second attempt shows the 7-day error toast. Staff has no nav item and is redirected away from /admin/top-sharers. Statement shows 'Top Sharer Reward'. Regression: the loss tab, calculator share and ShareStats still work, and test_bot_answers_ratings_share.py passed 4/4. Everything passed. Only minor issues remain.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/sharers/reward", "issue": "A run is inserted even when winners is empty. Example: amounts [0,0,5] with only 1-2 ranked sharers gives total $0 but still starts the 7-day lock. Return 400 when no winners are paid."},
+      {"endpoint": "POST /api/admin/sharers/reward", "issue": "The check-then-insert cooldown is not atomic. Two clicks at the same moment could pay twice. Consider a unique weekly key or findOneAndUpdate lock."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Player Leaderboard > Top sharers > Your week card", "issues": ["Grammar: shows '1 friends joined from your images'. Use the singular when friends === 1."]},
+      {"screen": "Admin Top sharers", "issues": ["The 'Send bonus credits' button stays enabled during the 7-day cooldown. Disable it or show 'next reward available on X' based on runs[0].created_at."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_top_sharers.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: reject reward runs with zero winners so they don't lock the week",
+    "Optional: fix '1 friends' grammar in the sharers-my-rank card",
+    "Optional: disable the reward button or show the cooldown when the last run is < 7 days old"
+  ],
+  "critical_code_review_comments": [
+    "referrals.py reward_sharers: the run is stored even if winners == [] (blocks the week for $0)",
+    "reward_sharers: race between the find_one on last run and insert (possible double payout on a double submit)",
+    "_top_sharers runs a full aggregate plus .to_list(100000) on every leaderboard request. Fine for now, but add an index on users {signup_source, created_at}."
+  ],
+  "updated_files": ["/app/backend/tests/test_top_sharers.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created 18 TEST users (4 sharers, 14 friends incl. 1 referred by demo) plus 2 reward runs (1 API, 1 UI). All cleaned up: users, their transactions, email_tokens and both sharer_reward_runs deleted. db.sharer_reward_runs is now empty, so the admin can run a real reward this week. Demo promo_balance was not changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run test_top_sharers.py with -n 0 (module fixture builds the data). It aborts if sharer_reward_runs is not empty. Set KEEP_SHARER_DATA=1 to keep users for UI tests (ids in /tmp/sharer_test_ids.json). After a KEEP run, delete the runs and users by id. Nav testids use the prefix 'nav-' (nav-admin-top-sharers). Admin login inputs: admin-login-email-input / admin-login-password-input. agentplayer1 gets a blocking Terms-update modal on login."
+}
