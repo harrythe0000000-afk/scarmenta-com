@@ -122,7 +122,7 @@ export async function shareBlob(blob, name, text) {
     return "shared";
   }
   downloadBlob(blob, name);
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank", "noopener");
   return "downloaded";
 }
 

@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only test of /app/demo-game (player demo@aetheria.io) at 1920px and 390px. I forced specific card outcomes by overriding crypto.getRandomValues in an init script. Passed: Portfolio bar (starts at +$0.00 and 0 rounds; P/L, rounds, wins, losses, win rate and biggest win are correct across Rivals, Teen Patti and Andar Bahar), Teen Patti (status shows 'Dealer scanning cards…' with the green scan line; cards are dealt alternately rivals/scarmenta; hand names appear; the winning hand gets a ring; math is correct: winner side returns 2x, net -100/+90/-100 checked, a rigged tie returned the stake with net +$0.00; bet spots and Clear are disabled while dealing), per-tab English/Hinglish switch (Rivals 'Card baanto'/'Bet hatao'/'milega 1:1', rules and 'Rivals jeete' while Andar Bahar stays English; Teen Patti status and result text in Hinglish; Andar Bahar Hinglish; choice saved in localStorage 'scarmenta_demo_langs' and kept after reload), Tutorial (3 guides including Teen Patti, own switch), streak (goes up on net>0 rounds and back to 0 on a loss or a tie; at 3 the Hot Streak badge, Share button and toast appear; Share downloads scarmenta-hot-streak.png, 1080x1350, showing the fire, '3 wins in a row', game name, referral code and register link, with no demo note; toast 'Image saved — attach it in WhatsApp'; wa.me opened; badge leaves after a loss), 'Ready for real play?' dialog after 5 rounds, sound toggle, Reset (balance, portfolio and streak). Calculator 'Save image' and 'Share on WhatsApp' still download scarmenta-calculator.png and open wa.me. No page errors. Problems found: the page scrolls sideways on mobile, and the small Teen Patti card faces spill outside the card.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DemoGame tabs (mobile 390px)", "issue": "TabsList [data-testid=demo-tabs] is 425px wide and does not wrap or scroll. The whole page becomes 441px wide, so the page scrolls sideways and the 'Tutorial' tab is cut off. Every tab of /app/demo-game is affected; /app is fine at 390px.", "selector": "[data-testid=demo-tabs]", "priority": "MEDIUM"},
+      {"component": "PlayingCard size='sm' (Teen Patti)", "issue": "On the small card (h-28 w-20, or h-24 w-16 on mobile), the bottom corner rank+suit, rotated 180°, spills out below the white card face. It overlaps the hand name ('High card') under each hand at both desktop and mobile. Use smaller text and padding for size='sm' (e.g. text-sm and a smaller middle suit) or add overflow-hidden.", "selector": "[data-testid^=demo-tp-rivals-card-], [data-testid^=demo-tp-scarmenta-card-]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Hot Streak share", "issues": ["The wa.me URL is encoded correctly (%F0%9F%94%A5), but WhatsApp's redirect from wa.me to api.whatsapp.com turns the 🔥 emoji into U+FFFD (%EF%BF%BD), so the shared message shows '�'. Using https://api.whatsapp.com/send?text= directly avoids this.", "The streak share link uses &src=calc, so streak shares are counted as calculator shares in the 'Friends from your shared images' stats. Consider src=streak, or confirm that this is intended."]},
+      {"screen": "Demo games streak meter", "issues": ["Reset clears the streak but not 'best N'. After Reset the meter shows '0 best 3'. Clear it too if Reset should start a fully fresh session."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Make the demo-tabs TabsList fit 390px: add w-full overflow-x-auto, or flex-wrap with h-auto, so the page no longer scrolls sideways and the Tutorial tab is fully visible.",
+    "Fix the small PlayingCard so the bottom corner rank and suit stay inside the card in Teen Patti (smaller fonts for size='sm' or overflow-hidden).",
+    "Optional: share the streak through api.whatsapp.com/send?text= to keep the emoji, use src=streak for streak shares, and reset 'best' on Reset."
+  ],
+  "critical_code_review_comments": [
+    "DemoGame.onRound reads `streak` from the render closure. This works now because only one round runs at a time, but a functional update (setStreak(s => ...)) is safer. setPrompt is also called inside the setStats updater, which is a side effect inside a state updater.",
+    "Radix TabsContent unmounts tabs that are not active. Switching tabs in the middle of a deal cancels the round without telling the player (the Teen Patti interval is cleared, but the final 600ms setTimeout is not tracked and can still fire on an unmounted component), and bets and the Rivals history are lost. Consider forceMount with hidden, or block tab changes while a deal is running.",
+    "Pressing Reset during a deal still applies that round's net after the reset."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "92%"},
+  "seed_data_creation": "None. The demo game is client-side only; no data was created.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "To force outcomes, add an init script that overrides crypto.getRandomValues to shift values from window.__q (one Uint32 per call). Rivals win: __q=[12,0,0,0]; Rivals loss: [0,0,12,0]. Teen Patti tie (K♠9♥4♦ vs K♥9♠4♣), 51 values for the shuffle: [51,50,47,46,45,44,43,42,41,40,39,38,37,36,35,34,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,13,12,11,10,9,8,7,6,5,4,3,2,1,0,3,4,1,2,1]. Use '[role=tabpanel][data-state=active]' to scope demo-result in Andar Bahar. Override window.open to capture the wa.me URL. Check document.documentElement.scrollWidth at 390px (currently 441)."
+}

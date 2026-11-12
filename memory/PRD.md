@@ -108,3 +108,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## 2026-11-12 Tutorial language + win streak
 - Tutorial EN/Hinglish toggle (localStorage scarmenta_tutorial_lang)
 - Win streak counter (net>0 rounds in a row, both tables) + best; "Hot Streak" badge + toast at 3
+
+## 2026-11-12 Teen Patti demo, per-tab Hinglish, streak share, portfolio
+- Teen Patti table (Rivals vs Scarmenta, 3 cards each, scan-line dealer effect, hand ranking lib/teenPatti.js, 1:1, tie push)
+- Per-tab EN/Hinglish switch (lib/demoText.js, localStorage scarmenta_demo_langs)
+- Session Portfolio bar (P/L, rounds, wins, losses, win rate, biggest win)
+- Hot Streak share image (1080x1350, referral code + link, no demo note per user) via shareBlob (Web Share / download + api.whatsapp.com)
+- Tests: iteration_18.json; fixed mobile tab overflow, small card text, WhatsApp emoji, Reset clears best

@@ -88,7 +88,7 @@ export default function DemoGame() {
       <Portfolio stats={stats} />
       <Tabs defaultValue="rivals">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <TabsList className="bg-black/40" data-testid="demo-tabs">
+          <TabsList className="h-auto max-w-full flex-wrap justify-start bg-black/40" data-testid="demo-tabs">
             <TabsTrigger value="rivals" data-testid="demo-tab-rivals">Scarmenta vs Rivals</TabsTrigger>
             <TabsTrigger value="andar-bahar" data-testid="demo-tab-andar-bahar">Andar Bahar</TabsTrigger>
             <TabsTrigger value="teen-patti" data-testid="demo-tab-teen-patti">Teen Patti</TabsTrigger>
@@ -103,7 +103,7 @@ export default function DemoGame() {
             <Button size="icon" variant="outline" onClick={toggleSound} data-testid="demo-sound-toggle" aria-label={sound ? "Mute" : "Unmute"} className="rounded-full border-purple-500/30 bg-transparent">
               {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
-            <Button variant="outline" onClick={() => { setBalance(START); setStats(EMPTY_STATS); setStreak(0); }} data-testid="demo-reset-button" className="rounded-full border-purple-500/30 bg-transparent"><RotateCcw className="mr-2 h-4 w-4" /> Reset</Button>
+            <Button variant="outline" onClick={() => { setBalance(START); setStats(EMPTY_STATS); setStreak(0); setBest(0); }} data-testid="demo-reset-button" className="rounded-full border-purple-500/30 bg-transparent"><RotateCcw className="mr-2 h-4 w-4" /> Reset</Button>
           </div>
         </div>
         <div className="card-lux p-5 sm:p-8">

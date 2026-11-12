@@ -17,16 +17,17 @@ export const shuffledDeck = () => {
 };
 
 const SIZES = { lg: "h-36 w-24 sm:h-44 sm:w-32", sm: "h-24 w-16 sm:h-28 sm:w-20" };
+const TEXT = { lg: ["text-lg sm:text-xl", "text-4xl sm:text-5xl", "p-2"], sm: ["text-xs sm:text-sm", "text-2xl sm:text-3xl", "p-1.5"] };
 
 export const PlayingCard = ({ card, testId, delay = 0, size = "lg", children }) => (
   <div className={`relative ${SIZES[size]} [perspective:800px]`} data-testid={testId}>
     <AnimatePresence mode="wait">
       {card ? (
         <motion.div key={`${card.rank}-${card.suit}-${delay}`} initial={{ rotateY: 180, y: -30, opacity: 0 }} animate={{ rotateY: 0, y: 0, opacity: 1 }}
-          transition={{ duration: 0.55, delay }} className="absolute inset-0 flex flex-col justify-between rounded-xl bg-white p-2 shadow-xl shadow-black/50">
-          <span className={`text-lg font-bold leading-none sm:text-xl ${SUITS[card.suit][1]}`}>{RANKS[card.rank - 1]}<br />{SUITS[card.suit][0]}</span>
-          <span className={`self-center text-4xl sm:text-5xl ${SUITS[card.suit][1]}`}>{SUITS[card.suit][0]}</span>
-          <span className={`rotate-180 text-lg font-bold leading-none sm:text-xl ${SUITS[card.suit][1]}`}>{RANKS[card.rank - 1]}<br />{SUITS[card.suit][0]}</span>
+          transition={{ duration: 0.55, delay }} className={`absolute inset-0 flex flex-col justify-between overflow-hidden rounded-xl bg-white shadow-xl shadow-black/50 ${TEXT[size][2]}`}>
+          <span className={`font-bold leading-none ${TEXT[size][0]} ${SUITS[card.suit][1]}`}>{RANKS[card.rank - 1]}<br />{SUITS[card.suit][0]}</span>
+          <span className={`self-center ${TEXT[size][1]} ${SUITS[card.suit][1]}`}>{SUITS[card.suit][0]}</span>
+          <span className={`rotate-180 font-bold leading-none ${TEXT[size][0]} ${SUITS[card.suit][1]}`}>{RANKS[card.rank - 1]}<br />{SUITS[card.suit][0]}</span>
         </motion.div>
       ) : (
         <motion.div key="back" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
