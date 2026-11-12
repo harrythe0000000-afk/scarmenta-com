@@ -1,10 +1,12 @@
+import hashlib
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
-from core import db, site_url, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
+from core import client_ip, now, db, site_url, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
 
 router = APIRouter(prefix="/api")
 
@@ -61,10 +63,14 @@ class ShareVisitIn(BaseModel):
 
 
 @router.post("/share/visit")
-async def share_visit(body: ShareVisitIn):
+async def share_visit(body: ShareVisitIn, request: Request):
     ref = await db.users.find_one({"referral_code": body.code.strip().upper(), "role": "user"}, {"_id": 0, "id": 1})
     if ref:
-        await db.share_visits.insert_one({"referrer_id": ref["id"], "source": "calc_share", "created_at": now_iso()})
+        ip = hashlib.sha256(client_ip(request).encode()).hexdigest()[:24]
+        day = (now() - timedelta(hours=24)).isoformat()
+        await db.share_visits.update_one({"referrer_id": ref["id"], "ip_hash": ip, "created_at": {"$gt": day}},
+                                         {"$setOnInsert": {"referrer_id": ref["id"], "ip_hash": ip, "source": "calc_share",
+                                                           "created_at": now_iso()}}, upsert=True)
     return {"ok": True}
 
 
@@ -75,7 +81,8 @@ async def share_me(user: dict = Depends(get_current_user)):
     return {"bonus_amount": s.get("share_bonus_amount", 0),
             "visits": await db.share_visits.count_documents({"referrer_id": user["id"]}),
             "signups": await db.users.count_documents(q),
-            "deposited": await db.users.count_documents({**q, "share_bonus_paid": True}),
+            "deposited": len(await db.deposits.distinct("user_id", {
+                "status": "approved", "user_id": {"$in": await db.users.distinct("id", q)}})),
             "earned": round(user.get("share_earnings", 0), 2)}
 
 

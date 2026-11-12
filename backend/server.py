@@ -181,7 +181,7 @@ class SettingsIn(BaseModel):
     loss_reward_percent: float = Field(ge=0, le=100)
     deposit_alerts: bool
     transfer_fee_percent: float = Field(ge=0, le=50)
-    share_bonus_amount: float = Field(default=5.0, ge=0, le=1000)
+    share_bonus_amount: Optional[float] = Field(default=None, ge=0, le=1000)
     packages: List[float] = Field(min_length=1, max_length=8)
     fx_rates: Dict[str, float]
     upi_id: str = Field(max_length=100)
@@ -798,7 +798,7 @@ async def admin_put_settings(body: SettingsIn, admin: dict = Depends(require_adm
         if not re.fullmatch(r"[A-Z]{3,5}", c) or rate <= 0:
             raise HTTPException(status_code=400, detail=f"Invalid currency rate: {code}")
         rates[c] = round(rate, 6)
-    data = body.model_dump()
+    data = body.model_dump(exclude_none=True)
     data["fx_rates"] = rates
     data.update({k: data[k].strip() for k in ("upi_id", "usdt_trc20", "usdt_erc20", "usdt_bep20")})
     data["packages"] = sorted({round(p, 2) for p in body.packages if p > 0})

@@ -112,10 +112,13 @@ const ChatPanel = ({ onClose, supportPath }) => {
       setBusy(false);
     }
   };
+  const rateQueue = useRef(Promise.resolve());
   const rate = async (id, rating, reason) => {
     setMsgs((m) => m.map((x) => (x.id === id ? { ...x, rating } : x)));
     try {
-      await api.post(`/assistant/messages/${id}/rate`, { rating, reason: reason || null });
+      const req = rateQueue.current.catch(() => {}).then(() => api.post(`/assistant/messages/${id}/rate`, { rating, reason: reason || null }));
+      rateQueue.current = req;
+      await req;
       if (rating === "down") toast.success("Thanks — this helps us improve Scara", { position: "top-center" });
     } catch {
       toast.error("Couldn't save your rating", { position: "top-center" });

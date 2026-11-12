@@ -79,3 +79,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Agents: chat widget + bot knows agent stats/tier; new /agent/support page
 - Admin/staff /admin/chat-insights: counts, top words (stopwords, no AI), repeated questions, latest 50; 7/30/90 days
 - Tests: iteration_14.json pass
+
+## 2026-11-12 Bot answers, chat ratings, share rewards
+- /admin/bot-answers: admin CRUD (staff view) of official Q&A injected into Scara system prompt (max 60)
+- Thumbs up/down on bot replies (+ optional reason on down); insights shows counts + disliked answers
+- Share link ?ref=CODE&src=calc: visits (deduped per IP/24h), signups (signup_source=calc_share), deposited, earned; share_bonus_amount setting (default $5) paid once on friend first approved deposit (tx type share_bonus)
+- Tests: iteration_15.json pass

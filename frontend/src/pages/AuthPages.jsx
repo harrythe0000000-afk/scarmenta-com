@@ -225,7 +225,7 @@ export const Register = () => {
     setBusy(true);
     setError("");
     try {
-      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null, accepted_terms: true, terms_version: TERMS_VERSION, signup_source: fromShare && form.referral_code ? "calc_share" : null });
+      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null, accepted_terms: true, terms_version: TERMS_VERSION, signup_source: fromShare && form.referral_code.trim().toUpperCase() === params.get("ref").toUpperCase() ? "calc_share" : null });
       toast.success(u.verification_sent ? "Account created — check your inbox to verify your email." : "Account created. Use 'Resend email' to get your verification link.");
       navigate("/app");
     } catch (err) {

@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 15: tested Instant Bot Answers, Chat Rating, Share Rewards and regressions end to end (backend pytest plus Playwright UI). Everything requested works. Bot answers: admin CRUD works and the staff/player RBAC checks pass (staff GET 200, writes 403; player 403). With the 'support hours' answer on, the Hinglish question got 'Support Monday se Saturday, 10 AM se 8 PM IST tak available hai.' (API and UI). With it off, the bot said it doesn't know the exact hours. Ratings: up/down persist, the reason is saved, history returns id+rating, another user's message gives 404, an invalid rating gives 422, and insights shows the counts and the disliked rows (question/answer/reason/name). Share: the WhatsApp link has ?ref=CODE&src=calc. A visit is recorded once per browser (no second POST after reload). Registering via the UI stored signup_source=calc_share. After the friend's first approved deposit the sharer got +$5 share_bonus plus the 10% referral, and the Statement shows the label 'Share Bonus'. The second deposit added no extra share bonus. A normal ?ref= signup gets no share bonus, and with share_bonus_amount=0 no bonus is paid. ShareStats card updated to visits 1/signups 1/deposited 1/earned $5. The Settings field saves and leaves the other values unchanged (checked by diff). Regressions pass: chat handoff/insights subset and popups/terms (26 tests).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/share/visit", "issue": "Public and has no rate limit or dedupe on the server, so anyone can inflate a user's 'Opened your link' count with repeated POSTs. Dedupe only exists in the browser's localStorage."},
+      {"endpoint": "GET /api/share/me", "issue": "'deposited' counts friends with share_bonus_paid=True. A friend who deposits while share_bonus_amount=0 is never counted as 'Made a deposit' and can never earn the bonus later. The count should come from approved deposits, not the bonus flag."},
+      {"endpoint": "PUT /api/admin/settings", "issue": "SettingsIn.share_bonus_amount defaults to 5.0. A client that leaves the field out silently resets a disabled bonus (0) back to $5. Make it required or keep the stored value."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Chat rating up then down", "issue": "One-off, could not reproduce: on the first UI run, clicking up and then down+reason left the DB at 'up', with 2 POSTs logged (both 200). Two later runs (same message and a fresh one) sent {rating:down, reason} correctly and it persisted. Flaky 1/3; worth a quick look at the request order.", "affected_selectors": ["chat-rate-up-{id}", "chat-rate-down-{id}", "chat-rate-reason-submit-{id}"]}
+    ],
+    "design_issues": [
+      {"screen": "Register (share link)", "issues": ["If the user edits the prefilled referral code on a src=calc page, signup_source=calc_share is still sent, so the share bonus goes to the new code owner."]},
+      {"screen": "Statement", "issues": ["The date filters use the browser's native mm/dd/yyyy picker instead of the shadcn calendar (existed before this change)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_bot_answers_ratings_share.py", "/app/test_reports/pytest/pytest_iter15.xml"],
+  "action_items": [
+    "Optional: rate-limit or dedupe POST /api/share/visit on the server (per IP+code per day)",
+    "Optional: count share 'deposited' from approved deposits instead of the share_bonus_paid flag",
+    "Optional: drop the default=5.0 on SettingsIn.share_bonus_amount so a missing field can't re-enable the bonus",
+    "Optional: send signup_source only when the referral code still equals the ?ref param"
+  ],
+  "critical_code_review_comments": [
+    "rate_message: the reason is stored only when rating is down (the conditional-expression precedence is correct); matching on user_id and role=assistant prevents rating someone else's message. Good.",
+    "reward_share uses an atomic find_one_and_update with share_bonus_paid $ne True, so it is idempotent. Good.",
+    "official_answers puts up to 60 Q&As into every system prompt. Fine at this size, but the token cost grows with each answer."
+  ],
+  "updated_files": ["/app/backend/tests/test_bot_answers_ratings_share.py"],
+  "success_rate": {"backend": "100% (4/4 new + 26/26 regression)", "frontend": "100% (1 flaky rating observation not reproduced)"},
+  "seed_data_creation": "None kept. All TEST_ users, deposits, transactions, share_visits, bot answers, chat sessions and the 2 handoff tickets I created were deleted by id. share_bonus_amount was restored to 5.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_bot_answers_ratings_share.py -n0 -s (2 LLM calls; cleans up after itself; temporarily sets share_bonus_amount=0 and restores it). Chat session id is in localStorage 'scarmenta_chat_session'. Register UI: tick register-agree-checkbox, scroll register-terms-scrollbox to the end, then tick register-terms-checkbox. Bot answer delete is a soft delete (deleted:true)."
+}
