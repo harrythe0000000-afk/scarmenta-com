@@ -146,3 +146,21 @@ async def send_reset_email(user: dict, token: str) -> None:
     html = _template(user["name"], "We received a request to reset the password on your account.",
                      "Choose a new password", link, "This link expires in 1 hour. If you did not request this, ignore this email.")
     await send_email(to=user["email"], subject=f"Reset your {EMAIL_FROM_NAME} password", html=html)
+
+
+async def send_otp_email(user: dict, code: str) -> None:
+    brand = escape(EMAIL_FROM_NAME)
+    html = (
+        '<table role="presentation" width="100%" style="background:#05040A;padding:32px 0">'
+        '<tr><td align="center"><table role="presentation" width="520" style="background:#120E24;'
+        'border:1px solid #2e2458;border-radius:16px;padding:32px;font-family:Arial,sans-serif;color:#F8FAFC">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#C084FC;padding-bottom:16px">{brand}</td></tr>'
+        f'<tr><td style="font-size:15px;line-height:1.6;color:#cbd5e1">Hi {escape(user["name"])},<br><br>'
+        'Use this one-time code to sign in. It expires in 10 minutes.</td></tr>'
+        f'<tr><td style="padding:24px 0;font-size:34px;letter-spacing:10px;font-weight:bold;color:#ffffff">{code}</td></tr>'
+        '<tr><td style="font-size:12px;color:#94A3B8">If you did not try to sign in, you can ignore this email.</td></tr>'
+        f'<tr><td style="font-size:11px;color:#64748B;padding-top:20px">Sent by {brand}. '
+        'Our team will never ask you for this code.</td></tr>'
+        '</table></td></tr></table>'
+    )
+    await send_email(to=user["email"], subject=f"{code} is your {EMAIL_FROM_NAME} sign-in code", html=html)

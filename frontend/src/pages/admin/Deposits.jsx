@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,9 @@ export default function AdminDeposits() {
   return (
     <>
       <PageHeader eyebrow="Deposit monitoring" title="Approval queue" desc="Approving a deposit adds credits to the player's balance at the configured multiplier." />
+      <Link to="/admin/settings" data-testid="admin-payment-setup-link" className="mb-5 flex items-center justify-between rounded-xl border border-purple-500/25 bg-purple-500/5 px-4 py-3 text-sm text-purple-200 transition-colors hover:bg-purple-500/10">
+        <span>Add or change where players pay you (UPI ID, USDT addresses, $ to ₹ rate) in Credit Config</span><span>Open →</span>
+      </Link>
       <Tabs value={status} onValueChange={setStatus} className="mb-5">
         <TabsList className="bg-white/[0.03]">
           {["pending", "approved", "rejected", "all"].map((s) => <TabsTrigger key={s} value={s} data-testid={`admin-deposits-tab-${s}`} className="capitalize data-[state=active]:bg-purple-600 data-[state=active]:text-white">{s}</TabsTrigger>)}

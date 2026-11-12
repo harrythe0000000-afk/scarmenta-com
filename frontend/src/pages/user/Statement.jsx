@@ -12,8 +12,8 @@ export default function UserStatement() {
   const totals = useTotals(data);
   return (
     <>
-      <PageHeader eyebrow="Account statement" title="Transaction ledger" desc={`${user?.name} · ${user?.email} · Issued by Aetheria Credit Ltd, Cyprus`}
-        action={<StatementActions rows={data} name={`aetheria-statement-${new Date().toISOString().slice(0, 10)}.csv`} />} />
+      <PageHeader eyebrow="Account statement" title="Transaction ledger" desc={`${user?.name} · ${user?.email} · Issued by SquareManta Ltd, Cyprus`}
+        action={<StatementActions rows={data} name={`squaremanta-statement-${new Date().toISOString().slice(0, 10)}.csv`} />} />
       <TxFilters filters={filters} setFilters={setFilters} />
       <TotalsBar totals={totals} count={data?.length || 0} />
       <TxTable rows={data} testId="statement-tx-table" />

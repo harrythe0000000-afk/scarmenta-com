@@ -2,7 +2,7 @@ from core import (db, client, now, now_iso, new_id, clean, hash_password, verify
                   set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin,
                   get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, FRONTEND_URL, make_tx,
                   unique_referral_code)
-from emailer import send_verification_email, send_reset_email
+from emailer import send_verification_email, send_reset_email, send_otp_email
 import games
 import referrals
 import rewards
@@ -48,6 +48,8 @@ INDEXES: dict[str, list[IndexModel]] = {
                           IndexModel([("provider_id", ASCENDING), ("round_id", ASCENDING), ("user_id", ASCENDING)], name="round"),
                           IndexModel([("created_at", DESCENDING)], name="created_desc")],
     "loss_reward_runs": [IndexModel([("period_end", DESCENDING)], name="period_end")],
+    "login_otps": [IndexModel([("email", ASCENDING)], name="email"),
+                   IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
     "login_attempts": [IndexModel([("identifier", ASCENDING)], name="identifier")],
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
@@ -81,6 +83,11 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class OtpVerifyIn(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{6}$")
 
 
 class TokenIn(BaseModel):
@@ -238,6 +245,50 @@ async def login(body: LoginIn, request: Request, response: Response):
     await db.users.update_one({"id": user["id"]}, {"$set": {"last_login_at": now_iso(), "last_ip": client_ip(request)}})
     set_auth_cookies(response, user)
     return clean(user)
+
+
+@api.post("/auth/otp/request")
+async def otp_request(body: EmailIn):
+    email = body.email.lower()
+    user = await db.users.find_one({"email": email, "status": "active"}, {"_id": 0, "password_hash": 0})
+    if not user:
+        return {"ok": True}
+    since = (now() - timedelta(seconds=60)).isoformat()
+    if await db.login_otps.find_one({"email": email, "created_at": {"$gte": since}}):
+        raise HTTPException(status_code=429, detail="Please wait a minute before requesting another code")
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    await db.login_otps.delete_many({"email": email})
+    await db.login_otps.insert_one({"email": email, "code_hash": hash_password(code), "attempts": 0,
+                                    "created_at": now_iso(), "expires_at": now() + timedelta(minutes=10)})
+    try:
+        await send_otp_email(user, code)
+    except Exception as exc:
+        logger.error("otp email failed for %s: %s", email, exc)
+        await db.login_otps.delete_many({"email": email})
+        raise HTTPException(status_code=502, detail="Could not send the code right now. Try again shortly.")
+    return {"ok": True}
+
+
+@api.post("/auth/otp/verify")
+async def otp_verify(body: OtpVerifyIn, request: Request, response: Response):
+    email = body.email.lower()
+    otp = await db.login_otps.find_one({"email": email})
+    if not otp or otp["expires_at"].replace(tzinfo=timezone.utc) < now():
+        raise HTTPException(status_code=400, detail="This code has expired. Request a new one.")
+    if otp["attempts"] >= 5:
+        await db.login_otps.delete_many({"email": email})
+        raise HTTPException(status_code=429, detail="Too many wrong codes. Request a new one.")
+    if not verify_password(body.code, otp["code_hash"]):
+        await db.login_otps.update_one({"_id": otp["_id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=401, detail="Incorrect code")
+    await db.login_otps.delete_many({"email": email})
+    user = await db.users.find_one_and_update(
+        {"email": email}, {"$set": {"email_verified": True, "last_login_at": now_iso(), "last_ip": client_ip(request)}},
+        projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    if not user or user.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
+    set_auth_cookies(response, user)
+    return user
 
 
 @api.post("/auth/logout")

@@ -55,6 +55,79 @@ const SubmitBtn = ({ busy, children, testId }) => (
 const ErrorText = ({ error, testId }) => error ? <p data-testid={testId} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p> : null;
 
 export const Login = () => {
+  const [mode, setMode] = useState("password");
+  return (
+    <AuthLayout title="Welcome back" subtitle="Sign in to your SquareManta account."
+      footer={<>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></>}>
+      <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid="login-mode-toggle">
+        {[["password", "Password"], ["otp", "Email code (OTP)"]].map(([v, l]) => (
+          <button key={v} type="button" data-testid={`login-mode-${v}`} onClick={() => setMode(v)}
+            className={`rounded-full py-2 text-sm font-medium transition-colors ${mode === v ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"}`}>{l}</button>
+        ))}
+      </div>
+      {mode === "password" ? <PasswordLogin /> : <OtpLogin />}
+    </AuthLayout>
+  );
+};
+
+const OtpLogin = () => {
+  const { setUser } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const send = async (e) => {
+    e?.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await api.post("/auth/otp/request", { email });
+      setSent(true);
+      toast.success("If this email has an account, a 6-digit code is on its way.");
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const verify = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data } = await api.post("/auth/otp/verify", { email, code });
+      setUser(data);
+      navigate(data.role === "admin" ? "/admin" : "/app");
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return !sent ? (
+    <form onSubmit={send} className="space-y-5" data-testid="otp-request-form">
+      <Field id="otp-email" label="Email" type="email" required value={email} data-testid="otp-email-input" onChange={(e) => setEmail(e.target.value)} />
+      <ErrorText error={error} testId="otp-error" />
+      <SubmitBtn busy={busy} testId="otp-send-button">Send sign-in code</SubmitBtn>
+    </form>
+  ) : (
+    <form onSubmit={verify} className="space-y-5" data-testid="otp-verify-form">
+      <p className="text-sm text-slate-400">Enter the 6-digit code sent to <span className="text-white">{email}</span>. It expires in 10 minutes.</p>
+      <Field id="otp-code" label="6-digit code" inputMode="numeric" maxLength={6} required value={code} data-testid="otp-code-input"
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+      <ErrorText error={error} testId="otp-error" />
+      <SubmitBtn busy={busy} testId="otp-verify-button">Sign in</SubmitBtn>
+      <div className="flex justify-between text-xs">
+        <button type="button" className="text-slate-400 hover:text-purple-300" data-testid="otp-change-email" onClick={() => { setSent(false); setCode(""); }}>Use another email</button>
+        <button type="button" className="text-purple-300 hover:text-purple-200" data-testid="otp-resend" onClick={send} disabled={busy}>Resend code</button>
+      </div>
+    </form>
+  );
+};
+
+const PasswordLogin = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
@@ -74,18 +147,15 @@ export const Login = () => {
     }
   };
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your Aetheria account."
-      footer={<>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></>}>
-      <form onSubmit={submit} className="space-y-5" data-testid="login-form">
-        <Field id="email" label="Email" type="email" required value={form.email} data-testid="login-email-input" onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <Field id="password" label="Password" type="password" required value={form.password} data-testid="login-password-input" onChange={(e) => setForm({ ...form, password: e.target.value })} />
-        <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-xs text-slate-400 hover:text-purple-300" data-testid="forgot-password-link">Forgot password?</Link>
-        </div>
-        <ErrorText error={error} testId="login-error" />
-        <SubmitBtn busy={busy} testId="login-submit-button">Sign in</SubmitBtn>
-      </form>
-    </AuthLayout>
+    <form onSubmit={submit} className="space-y-5" data-testid="login-form">
+      <Field id="email" label="Email" type="email" required value={form.email} data-testid="login-email-input" onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <Field id="password" label="Password" type="password" required value={form.password} data-testid="login-password-input" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <div className="flex justify-end">
+        <Link to="/forgot-password" className="text-xs text-slate-400 hover:text-purple-300" data-testid="forgot-password-link">Forgot password?</Link>
+      </div>
+      <ErrorText error={error} testId="login-error" />
+      <SubmitBtn busy={busy} testId="login-submit-button">Sign in</SubmitBtn>
+    </form>
   );
 };
 

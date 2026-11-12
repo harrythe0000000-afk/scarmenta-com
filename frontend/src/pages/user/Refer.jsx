@@ -19,7 +19,7 @@ const copy = async (text, label) => {
 export default function UserRefer() {
   const { data: r } = useFetch("/referrals/me");
   if (!r) return null;
-  const msg = `Join me on Aetheria and get 5X credits on your deposit. Use my code ${r.code}: ${r.link}`;
+  const msg = `Join me on SquareManta and get 5X credits on your deposit. Use my code ${r.code}: ${r.link}`;
   return (
     <>
       <PageHeader eyebrow="Refer & earn" title="Invite friends, earn credits" desc={`Earn ${r.bonus_percent}% referral income on every deposit your friends make, added straight to your balance.`} />

@@ -152,6 +152,6 @@ def make_tx(user: dict, kind: str, wallet: str, amount: float, description: str,
 async def unique_referral_code() -> str:
     import secrets
     while True:
-        code = "AE" + secrets.token_hex(3).upper()
+        code = "SM" + secrets.token_hex(3).upper()
         if not await db.users.find_one({"referral_code": code}):
             return code
