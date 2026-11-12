@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,7 +10,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 
-from core import db, get_current_user, get_settings, new_id, now, now_iso
+from agents import TIER_TEXT, _stats, tier_rate
+from core import db, get_current_user, require_staff, get_settings, new_id, new_ticket, now, now_iso
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -18,6 +20,8 @@ HISTORY_LIMIT = 30
 RATE_LIMIT = 20
 RATE_WINDOW_MIN = 10
 SESSION_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+TICKET_RE = re.compile(r"\[\[\s*TICKET:\s*(.+?)\s*\|\s*(\w+)\s*\]\]", re.S)
+CATEGORIES = {"deposit", "wallet", "account", "technical", "other"}
 
 
 class ChatIn(BaseModel):
@@ -33,11 +37,10 @@ def platform_facts(s: dict) -> str:
 - NO WITHDRAWALS: credits are never withdrawable as cash. Credits are used on partner game platforms from the Games page.
 - Transfers: credits can be sent to another Scarmenta user from the Transfer page with a {s['transfer_fee_percent']:g}% fee.
 - Refer & Earn: {s['referral_bonus_percent']:g}% of friends' approved deposits. Loss rewards: {s['loss_reward_percent']:g}% of weekly net game losses, paid weekly.
-- Agents earn tiered commission on referred players: 5% (1-10 referrals), 7% (10-50), 10% (over 50).
+- Agents earn tiered commission on their referred players' approved deposits: 1-10 players 5%, 11-50 players 7%, 51+ players 10%. Agents see players, commissions and payouts in the Agent Portal; payouts are made by Scarmenta admin.
 - Login with email + password or a 6-digit email code (OTP). Forgot password link is on the login page.
 - Scarmenta does NOT guarantee profits, winnings or daily earnings. The compound calculator is only a math example.
-- Pages in the player dashboard: Overview, Deposits, Transfer, Games, Calculator, Refer & Earn, Loss Rewards, Statement, Support, My Account.
-- Anything you can't resolve (payment disputes, refunds, account problems): tell the user to open a ticket on the Support page."""
+- Player dashboard pages: Overview, Deposits, Transfer, Games, Calculator, Refer & Earn, Loss Rewards, Statement, Support, My Account. Agent portal pages: Dashboard, Support, My Account."""
 
 
 async def account_snapshot(user: dict) -> str:
@@ -56,15 +59,47 @@ async def account_snapshot(user: dict) -> str:
 - Referral code: {user.get('referral_code') or '-'}, referral earnings: ${user.get('referral_earnings', 0):,.2f}, loss rewards received: ${user.get('loss_rewards_total', 0):,.2f}"""
 
 
+async def agent_snapshot(agent: dict) -> str:
+    st = (await _stats([agent["id"]]))[agent["id"]]
+    return f"""This agent's account (private to them; share only with them):
+- Name: {agent.get('name')}, agent code: {agent.get('agent_code') or '-'}, signup link uses ?agent=<code>
+- Referred players: {st['players']}, current commission rate: {tier_rate(st['players']):g}% ({TIER_TEXT})
+- Player deposit volume: ${st['volume']:,.2f}; commission earned: ${st['earned']:,.2f}; unpaid: ${st['unpaid']:,.2f}; paid out: ${st['paid']:,.2f}"""
+
+
+TICKET_RULE = """If you cannot resolve the issue yourself (deposit not credited, refunds, disputes, locked account, bugs, anything needing staff), or the user asks for a human, tell them in one sentence that you are opening a support ticket for them, then end your reply with exactly this tag on its own line:
+[[TICKET: <short subject in English, max 80 chars> | <one of: deposit, wallet, account, technical, other>]]
+Use the tag only when really needed, never for questions you answered."""
+
+
 async def system_prompt(user: dict) -> str:
-    return f"""You are Scara, the friendly Scarmenta help assistant inside the player dashboard.
+    snapshot = await (agent_snapshot(user) if user["role"] == "agent" else account_snapshot(user))
+    where = "agent portal" if user["role"] == "agent" else "player dashboard"
+    return f"""You are Scara, the friendly Scarmenta help assistant inside the {where}.
 Answer briefly (2-6 short sentences or a short list). Plain text only, no markdown symbols like ** or #. Reply in the same language the user writes in (Hindi, Hinglish, English, etc.).
 Never promise profits or returns. Never say withdrawals are possible. Never ask for passwords, OTP codes or payment PINs.
 You cannot change balances, approve deposits or perform actions; explain which page to use instead.
 
+{TICKET_RULE}
+
 {platform_facts(await get_settings())}
 
-{await account_snapshot(user)}"""
+{snapshot}"""
+
+
+async def ticket_from_chat(user: dict, session_id: str, m: re.Match, past: list, text: str) -> dict:
+    existing = await db.tickets.find_one({"chat_session_id": session_id, "user_id": user["id"], "status": {"$ne": "closed"}},
+                                         {"_id": 0, "reference": 1})
+    if existing:
+        return existing
+    lines = [f"{'Me' if x['role'] == 'user' else 'Scara (AI)'}: {x['content']}" for x in reversed(past[:10])]
+    transcript = "\n".join([*lines, f"Me: {text}"])[-1900:]
+    category = m.group(2).lower() if m.group(2).lower() in CATEGORIES else "other"
+    subject = (m.group(1).strip() or "Help requested via chat")[:110]
+    t = new_ticket(user, subject, category, f"Opened by the AI assistant. Chat so far:\n{transcript}",
+                   chat_session_id=session_id, source="assistant")
+    await db.tickets.insert_one(dict(t))
+    return t
 
 
 @router.get("/assistant/history")
@@ -76,8 +111,8 @@ async def history(session_id: str = Query(min_length=8, max_length=64), user: di
 
 @router.post("/assistant/chat")
 async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
-    if user["role"] != "user":
-        raise HTTPException(status_code=403, detail="The assistant is available for players only")
+    if user["role"] not in ("user", "agent"):
+        raise HTTPException(status_code=403, detail="The assistant is available for players and agents only")
     if not SESSION_RE.match(body.session_id):
         raise HTTPException(status_code=400, detail="Invalid session")
     past = await db.chat_messages.find({"user_id": user["id"], "session_id": body.session_id},
@@ -92,23 +127,72 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
     asked_at = now_iso()
 
     async def events():
-        reply = ""
+        reply, sent = "", 0
         try:
             async for ev in llm.stream_message(UserMessage(text=text)):
                 if isinstance(ev, TextDelta):
                     reply += ev.content
-                    yield f"data: {json.dumps({'delta': ev.content})}\n\n"
+                    cut = reply.find("[[")
+                    safe = cut if cut >= 0 else len(reply) - (1 if reply.endswith("[") else 0)
+                    if safe > sent:
+                        yield f"data: {json.dumps({'delta': reply[sent:safe]})}\n\n"
+                        sent = safe
                 elif isinstance(ev, StreamDone):
                     break
         except Exception as e:
             logger.error(f"assistant stream failed: {e}")
             yield f"data: {json.dumps({'error': 'The assistant is busy right now. Please try again in a moment.'})}\n\n"
-        if reply:
-            await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
-                                               "role": "user", "content": text, "created_at": asked_at})
-            await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
-                                               "role": "assistant", "content": reply, "created_at": now_iso()})
+        m, cut = TICKET_RE.search(reply), reply.find("[[")
+        if cut >= 0:
+            reply = reply[:cut].rstrip()
+        elif len(reply) > sent:
+            yield f"data: {json.dumps({'delta': reply[sent:]})}\n\n"
+        if not reply:
+            yield "data: [DONE]\n\n"
+            return
+        if m:
+            ticket = await ticket_from_chat(user, body.session_id, m, past, text)
+            note = f"\n\nSupport ticket {ticket['reference']} is open. Our team will reply on the Support page."
+            reply += note
+            yield f"data: {json.dumps({'delta': note, 'ticket': {'reference': ticket['reference']}})}\n\n"
+        await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
+                                           "role": "user", "content": text, "created_at": asked_at})
+        await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
+                                           "role": "assistant", "content": reply, "created_at": now_iso()})
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+STOP = set("""a an the and or but if then so to of in on at for from by with about as is are was were be been am i me my
+you your we our it its this that these those what which who whom how why when where can could would should will do does did
+have has had not no yes please hi hello hey ok okay thanks thank kya hai hain ho hoga kaise kaisa kab kahan kyu kyun mera meri
+mere mujhe main mai hum aap ap tum ka ki ke ko se me mein par pe aur ya bhi nahi na toh to tha thi the kar karna karu karo
+karein kuch koi ek bata batao btao sakta sakte sakti raha rahi rahe chahiye wala wali wale abhi gaya gayi karni
+kisi hoon baat maine poocha kitni kitna kitne kab tak liye sab work want need help get""".split())
+
+
+@router.get("/admin/assistant/insights")
+async def insights(days: int = Query(default=30, ge=1, le=365), _: dict = Depends(require_staff)):
+    since = (now() - timedelta(days=days)).isoformat()
+    qs = await db.chat_messages.find({"role": "user", "created_at": {"$gt": since}},
+                                     {"_id": 0, "content": 1, "user_id": 1, "session_id": 1, "created_at": 1}
+                                     ).sort("created_at", -1).to_list(5000)
+    words, repeats = Counter(), Counter()
+    for q in qs:
+        norm = " ".join(re.findall(r"[\w']+", q["content"].lower()))
+        repeats[norm] += 1
+        words.update({w for w in norm.split() if len(w) > 2 and w not in STOP and not w.isdigit()})
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": list({q["user_id"] for q in qs})}},
+                                                     {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(5000)}
+    return {
+        "days": days, "questions": len(qs), "people": len({q["user_id"] for q in qs}),
+        "chats": len({q["session_id"] for q in qs}),
+        "tickets": await db.tickets.count_documents({"source": "assistant", "created_at": {"$gt": since}}),
+        "top_words": [{"word": w, "count": c} for w, c in words.most_common(25)],
+        "top_questions": [{"question": q, "count": c} for q, c in repeats.most_common(10) if c > 1],
+        "recent": [{"question": q["content"], "created_at": q["created_at"],
+                    "name": users.get(q["user_id"], {}).get("name", "—"), "role": users.get(q["user_id"], {}).get("role", "user")}
+                   for q in qs[:50]],
+    }

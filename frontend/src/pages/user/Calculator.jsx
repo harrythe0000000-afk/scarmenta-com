@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/StatCard";
+import { ShareResult } from "@/components/ShareResult";
 
 const UNITS = [["days", "Days", 1], ["weeks", "Weeks", 7], ["months", "Months", 30], ["years", "Years", 365]];
 const PRESETS = [[10, "days"], [20, "days"], [30, "days"], [6, "months"], [1, "years"], [500, "days"]];
@@ -137,6 +138,7 @@ export default function CompoundCalculator() {
           {!Number.isFinite(res.final) && <p className="text-xs text-amber-300" data-testid="calc-overflow-note">This result is too large to calculate. Try a lower return or a shorter period.</p>}
           {rawDays > MAX_DAYS && <p className="text-xs text-amber-300" data-testid="calc-cap-note">Capped at {MAX_DAYS.toLocaleString()} days (10 years).</p>}
           <Results amount={amount} days={days} res={res} />
+          <ShareResult amount={amount} rate={rate} days={days} res={res} />
           <GrowthChart data={res.chart} />
           <Breakdown rows={res.rows} />
         </div>

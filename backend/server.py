@@ -1,4 +1,4 @@
-from core import (db, client, now, now_iso, new_id, clean, hash_password, verify_password, set_auth_cookies,
+from core import (db, client, new_ticket, now, now_iso, new_id, clean, hash_password, verify_password, set_auth_cookies,
                   set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin, require_staff,
                   get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, SITE_ORIGINS, site_url, make_tx,
                   unique_referral_code)
@@ -610,10 +610,7 @@ async def my_transactions(type: Optional[str] = None, wallet: Optional[str] = No
 
 @api.post("/support/tickets")
 async def create_ticket(body: TicketIn, user: dict = Depends(get_current_user)):
-    t = {"id": new_id(), "reference": f"TCK-{secrets.token_hex(3).upper()}", "user_id": user["id"],
-         "user_email": user["email"], "user_name": user["name"], "subject": body.subject, "category": body.category,
-         "status": "open", "messages": [{"author_role": "user", "author_name": user["name"], "message": body.message,
-                                         "created_at": now_iso()}], "created_at": now_iso(), "updated_at": now_iso()}
+    t = new_ticket(user, body.subject, body.category, body.message)
     await db.tickets.insert_one(t)
     return clean(t)
 

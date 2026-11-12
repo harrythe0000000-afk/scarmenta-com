@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -61,6 +62,14 @@ def clean(doc: dict) -> dict:
     doc.pop("_id", None)
     doc.pop("password_hash", None)
     return doc
+
+
+def new_ticket(user: dict, subject: str, category: str, message: str, **extra) -> dict:
+    ts = now_iso()
+    return {"id": new_id(), "reference": f"TCK-{secrets.token_hex(3).upper()}", "user_id": user["id"],
+            "user_email": user["email"], "user_name": user["name"], "subject": subject, "category": category,
+            "status": "open", "messages": [{"author_role": user["role"], "author_name": user["name"], "message": message,
+                                            "created_at": ts}], "created_at": ts, "updated_at": ts, **extra}
 
 
 def hash_password(password: str) -> str:

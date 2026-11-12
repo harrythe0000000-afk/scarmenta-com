@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, MessageCircle, Plus, Send, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { v4 as uuid } from "uuid";
 import { Button } from "@/components/ui/button";
 import { api, API } from "@/lib/api";
@@ -39,7 +41,7 @@ async function streamReply(body, onDelta) {
       if (!line || line === "[DONE]") continue;
       const ev = JSON.parse(line);
       if (ev.error) throw new Error(ev.error);
-      onDelta(ev.delta);
+      onDelta(ev.delta, ev.ticket);
     }
   }
 }
@@ -52,7 +54,8 @@ const Bubble = ({ m }) => (
   </div>
 );
 
-const ChatPanel = ({ onClose }) => {
+const ChatPanel = ({ onClose, supportPath }) => {
+  const navigate = useNavigate();
   const [session, setSession] = useState(getSession);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
@@ -72,7 +75,10 @@ const ChatPanel = ({ onClose }) => {
     setMsgs((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
     const patch = (fn) => setMsgs((m) => [...m.slice(0, -1), { role: "assistant", content: fn(m[m.length - 1].content) }]);
     try {
-      await streamReply({ session_id: session, message }, (d) => patch((c) => c + d));
+      await streamReply({ session_id: session, message }, (d, ticket) => {
+        patch((c) => c + d);
+        if (ticket) toast.success(`Support ticket ${ticket.reference} opened`, { action: { label: "View", onClick: () => navigate(supportPath) } });
+      });
     } catch (e) {
       patch((c) => c || e.message);
     } finally {
@@ -119,16 +125,16 @@ const ChatPanel = ({ onClose }) => {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </form>
-      <p className="px-4 pb-2 text-center text-[10px] text-slate-600">AI answers can be wrong. For payment issues use Support.</p>
+      <p className="px-4 pb-2 text-center text-[10px] text-slate-600">AI answers can be wrong. If needed, Scara opens a support ticket for you.</p>
     </div>
   );
 };
 
-export const ChatWidget = () => {
+export const ChatWidget = ({ supportPath }) => {
   const [open, setOpen] = useState(false);
   return (
     <>
-      {open && <ChatPanel onClose={() => setOpen(false)} />}
+      {open && <ChatPanel onClose={() => setOpen(false)} supportPath={supportPath} />}
       <button type="button" onClick={() => setOpen((o) => !o)} data-testid="chat-launcher-button" aria-label="Open help chat"
         className="fixed bottom-5 right-4 z-50 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-purple-900/50 transition-transform hover:scale-105">
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
