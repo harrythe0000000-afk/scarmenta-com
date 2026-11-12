@@ -85,3 +85,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Thumbs up/down on bot replies (+ optional reason on down); insights shows counts + disliked answers
 - Share link ?ref=CODE&src=calc: visits (deduped per IP/24h), signups (signup_source=calc_share), deposited, earned; share_bonus_amount setting (default $5) paid once on friend first approved deposit (tx type share_bonus)
 - Tests: iteration_15.json pass
+
+## 2026-11-12 Weekly loss leaderboard
+- /app/leaderboard (players only): top 10 by net game loss (bets - wins - rollbacks) over rolling last 7 days, global, masked names (De***o), own rank + estimated loss reward; GET /api/leaderboard/weekly in rewards.py
+- Removed Cyprus / South Asia / Middle East mentions from landing, auth, statement

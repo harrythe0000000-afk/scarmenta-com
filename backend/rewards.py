@@ -153,3 +153,26 @@ async def money_flow(_: dict = Depends(require_staff)):
         "bets": bets, "wins": wins, "refunds": refunds, "ggr": round(bets - refunds - wins, 2),
         "outstanding": await _sum("users", {"role": "user"}, "promo_balance"),
     }
+
+
+def _mask(name: str) -> str:
+    n = (name or "Player").split()[0]
+    return n[:2] + "***" + (n[-1] if len(n) > 3 else "")
+
+
+@router.get("/leaderboard/weekly")
+async def weekly_leaderboard(user: dict = Depends(get_current_user)):
+    end, start = now(), now() - timedelta(days=7)
+    totals = await _game_totals({"created_at": {"$gte": start.isoformat(), "$lt": end.isoformat()}})
+    players = {u["id"]: u for u in await db.users.find({"id": {"$in": list(totals)}, "role": "user"},
+                                                       {"_id": 0, "id": 1, "name": 1}).to_list(100000)}
+    ranked = sorted(((uid, t["net_loss"]) for uid, t in totals.items() if uid in players and t["net_loss"] > 0),
+                    key=lambda x: -x[1])
+    mine = next(((i + 1, v) for i, (uid, v) in enumerate(ranked) if uid == user["id"]), None)
+    pct = (await get_settings())["loss_reward_percent"]
+    return {
+        "start": start.isoformat(), "end": end.isoformat(), "players": len(ranked), "loss_reward_percent": pct,
+        "top": [{"rank": i + 1, "name": _mask(players[uid]["name"]), "net_loss": v, "is_me": uid == user["id"]}
+                for i, (uid, v) in enumerate(ranked[:10])],
+        "me": {"rank": mine[0], "net_loss": mine[1], "reward": round(mine[1] * pct / 100, 2)} if mine else None,
+    }
