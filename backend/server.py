@@ -1,6 +1,6 @@
 from core import (db, client, now, now_iso, new_id, clean, hash_password, verify_password, set_auth_cookies,
                   set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin, require_staff,
-                  get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, FRONTEND_URL, make_tx,
+                  get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, SITE_ORIGINS, site_url, make_tx,
                   unique_referral_code)
 from emailer import send_verification_email, send_reset_email, send_otp_email
 import games
@@ -200,10 +200,10 @@ async def consume_token(token: str, kind: str) -> dict:
     return doc
 
 
-async def send_verification(user: dict) -> bool:
+async def send_verification(user: dict, base_url: str) -> bool:
     token = await issue_token(user, "verify", 24)
     try:
-        await send_verification_email(user, token)
+        await send_verification_email(user, token, base_url)
         return True
     except Exception as exc:
         logger.error("verification email failed for %s: %s", user["email"], exc)
@@ -212,7 +212,7 @@ async def send_verification(user: dict) -> bool:
 
 # ---------- Auth ----------
 @api.post("/auth/register")
-async def register(body: RegisterIn, response: Response):
+async def register(body: RegisterIn, request: Request, response: Response):
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -228,7 +228,7 @@ async def register(body: RegisterIn, response: Response):
             "referred_by": referrer["id"] if referrer else None,
             "referred_by_email": referrer["email"] if referrer else None, "created_at": now_iso()}
     await db.users.insert_one(user)
-    sent = await send_verification(user)
+    sent = await send_verification(user, site_url(request))
     set_auth_cookies(response, user)
     return {**clean(user), "verification_sent": sent}
 
@@ -319,7 +319,7 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 @api.put("/auth/account")
-async def update_account(body: AccountIn, response: Response, user: dict = Depends(get_current_user)):
+async def update_account(body: AccountIn, request: Request, response: Response, user: dict = Depends(get_current_user)):
     ident = f"account:{user['id']}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("locked_until") and att["locked_until"] > now_iso():
@@ -353,7 +353,7 @@ async def update_account(body: AccountIn, response: Response, user: dict = Depen
     updated = await db.users.find_one_and_update({"id": user["id"]}, {"$set": changes},
                                                  projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
     if "email" in changes and full["role"] == "user":
-        await send_verification(updated)
+        await send_verification(updated, site_url(request))
     set_auth_cookies(response, updated)
     return updated
 
@@ -379,24 +379,24 @@ async def verify_email(body: TokenIn):
 
 
 @api.post("/auth/resend-verification")
-async def resend_verification(user: dict = Depends(get_current_user)):
+async def resend_verification(request: Request, user: dict = Depends(get_current_user)):
     if user.get("email_verified"):
         raise HTTPException(status_code=400, detail="Email already verified")
     since = (now() - timedelta(seconds=60)).isoformat()
     if await db.email_tokens.find_one({"user_id": user["id"], "kind": "verify", "created_at": {"$gte": since}}):
         raise HTTPException(status_code=429, detail="Please wait a minute before requesting another email")
-    if not await send_verification(user):
+    if not await send_verification(user, site_url(request)):
         raise HTTPException(status_code=503, detail="Could not send email right now. Try again shortly.")
     return {"ok": True}
 
 
 @api.post("/auth/forgot-password")
-async def forgot_password(body: EmailIn):
+async def forgot_password(body: EmailIn, request: Request):
     user = await db.users.find_one({"email": body.email.lower()}, {"_id": 0, "password_hash": 0})
     if user:
         token = await issue_token(user, "reset", 1)
         try:
-            await send_reset_email(user, token)
+            await send_reset_email(user, token, site_url(request))
         except Exception as exc:
             logger.error("reset email failed: %s", exc)
     return {"ok": True}
@@ -775,7 +775,7 @@ app.include_router(api)
 app.include_router(referrals.router)
 app.include_router(games.router)
 app.include_router(rewards.router)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[FRONTEND_URL],
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 
 

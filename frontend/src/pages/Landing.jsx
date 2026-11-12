@@ -188,7 +188,10 @@ export default function Landing() {
       <Trust />
       <footer className="border-t border-purple-500/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-10 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <BrandLogo testId="footer-logo-link" />
+          <div className="flex items-center gap-6">
+            <BrandLogo testId="footer-logo-link" />
+            <Link to="/admin/login" data-testid="footer-admin-login-link" className="text-xs text-slate-500 transition-colors hover:text-[#F2B94B]">Admin login</Link>
+          </div>
           <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} Scarmenta Ltd, Limassol, Cyprus.</p>
         </div>
       </footer>

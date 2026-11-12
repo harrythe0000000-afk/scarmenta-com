@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -54,11 +54,48 @@ const SubmitBtn = ({ busy, children, testId }) => (
 
 const ErrorText = ({ error, testId }) => error ? <p data-testid={testId} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p> : null;
 
+export const AdminLogin = () => {
+  const { user, login, logout } = useAuth();
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (user && user.role !== "user") return <Navigate to="/admin" replace />;
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const u = await login(form.email, form.password);
+      if (u.role === "user") {
+        await logout();
+        setError("This account doesn't have admin access. Players sign in from the main login page.");
+      } else navigate("/admin");
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <AuthLayout title="Admin sign in" subtitle="Owner and staff access to the Scarmenta admin dashboard."
+      footer={<>Not an admin? <Link to="/login" className="text-purple-300 hover:text-purple-200" data-testid="admin-login-to-player-link">Player login</Link></>}>
+      <form onSubmit={submit} className="space-y-5" data-testid="admin-login-form">
+        <Field id="admin-email" label="Admin email" type="email" required value={form.email} data-testid="admin-login-email-input" onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Field id="admin-password" label="Password" type="password" required value={form.password} data-testid="admin-login-password-input" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <ErrorText error={error} testId="admin-login-error" />
+        <SubmitBtn busy={busy} testId="admin-login-submit-button">Sign in to admin</SubmitBtn>
+      </form>
+    </AuthLayout>
+  );
+};
+
 export const Login = () => {
   const [mode, setMode] = useState("password");
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your Scarmenta account."
-      footer={<>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></>}>
+      footer={<div className="flex flex-wrap justify-between gap-2"><span>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></span>
+        <Link to="/admin/login" className="text-[#F2B94B] hover:text-amber-200" data-testid="login-to-admin-link">Admin login →</Link></div>}>
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid="login-mode-toggle">
         {[["password", "Password"], ["otp", "Email code (OTP)"]].map(([v, l]) => (
           <button key={v} type="button" data-testid={`login-mode-${v}`} onClick={() => setMode(v)}

@@ -1,9 +1,9 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pymongo import ReturnDocument
 
-from core import FRONTEND_URL, db, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
+from core import db, site_url, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
 
 router = APIRouter(prefix="/api")
 
@@ -14,7 +14,7 @@ def mask_name(name: str) -> str:
 
 
 @router.get("/referrals/me")
-async def my_referrals(user: dict = Depends(get_current_user)):
+async def my_referrals(request: Request, user: dict = Depends(get_current_user)):
     code = user.get("referral_code")
     if not code:
         code = await unique_referral_code()
@@ -26,7 +26,7 @@ async def my_referrals(user: dict = Depends(get_current_user)):
     refs = [{"name": mask_name(r["name"]), "joined_at": r["created_at"],
              "status": "earning" if r.get("referral_rewarded") else "pending",
              "reward": r.get("referral_reward", 0)} for r in rows]
-    return {"code": code, "link": f"{FRONTEND_URL}/register?ref={code}", "bonus_percent": s["referral_bonus_percent"],
+    return {"code": code, "link": f"{site_url(request)}/register?ref={code}", "bonus_percent": s["referral_bonus_percent"],
             "total_referred": len(refs), "total_earned": round(sum(r["reward"] for r in refs), 2), "referrals": refs}
 
 

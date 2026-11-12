@@ -6,7 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardShell from "@/components/DashboardShell";
 import Landing from "@/pages/Landing";
-import { Login, Register, ForgotPassword, ResetPassword, VerifyEmail } from "@/pages/AuthPages";
+import { Login, Register, ForgotPassword, ResetPassword, VerifyEmail, AdminLogin } from "@/pages/AuthPages";
 import UserOverview from "@/pages/user/Overview";
 import UserDeposits from "@/pages/user/Deposits";
 import UserStatement from "@/pages/user/Statement";
@@ -64,6 +64,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />

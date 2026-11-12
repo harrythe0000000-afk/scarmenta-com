@@ -16,6 +16,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 client = AsyncIOMotorClient(os.environ["MONGO_URL"])
 db = client[os.environ["DB_NAME"]]
 FRONTEND_URL = os.environ["FRONTEND_URL"]
+SITE_ORIGINS = {FRONTEND_URL.rstrip("/")} | {
+    o.strip().rstrip("/") for o in os.environ.get("ALLOWED_SITE_ORIGINS", "").split(",") if o.strip()}
+
+
+def site_url(request: Request) -> str:
+    origin = (request.headers.get("origin") or "").rstrip("/")
+    return origin if origin in SITE_ORIGINS else FRONTEND_URL
 JWT_ALGORITHM = "HS256"
 
 DEFAULT_SETTINGS = {

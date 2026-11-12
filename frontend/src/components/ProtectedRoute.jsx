@@ -10,7 +10,7 @@ export const FullLoader = () => (
 export default function ProtectedRoute({ role, children }) {
   const { user } = useAuth();
   if (user === null) return <FullLoader />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to={role === "user" ? "/login" : "/admin/login"} replace />;
   if (role === "admin" && user.role === "user") return <Navigate to="/app" replace />;
   if (role === "owner" && user.role !== "admin") return <Navigate to="/admin" replace />;
   if (role === "user" && user.role !== "user") return <Navigate to="/admin" replace />;

@@ -134,15 +134,15 @@ def _template(name: str, intro: str, cta: str, link: str, note: str) -> str:
     )
 
 
-async def send_verification_email(user: dict, token: str) -> None:
-    link = f"{FRONTEND_URL}/verify-email?token={token}"
+async def send_verification_email(user: dict, token: str, base_url: str = FRONTEND_URL) -> None:
+    link = f"{base_url}/verify-email?token={token}"
     html = _template(user["name"], "Confirm your email address to activate deposits and credit packages on your account.",
                      "Verify email", link, "This link expires in 24 hours. If you did not create an account, ignore this email.")
     await send_email(to=user["email"], subject=f"Verify your {EMAIL_FROM_NAME} account", html=html)
 
 
-async def send_reset_email(user: dict, token: str) -> None:
-    link = f"{FRONTEND_URL}/reset-password?token={token}"
+async def send_reset_email(user: dict, token: str, base_url: str = FRONTEND_URL) -> None:
+    link = f"{base_url}/reset-password?token={token}"
     html = _template(user["name"], "We received a request to reset the password on your account.",
                      "Choose a new password", link, "This link expires in 1 hour. If you did not request this, ignore this email.")
     await send_email(to=user["email"], subject=f"Reset your {EMAIL_FROM_NAME} password", html=html)
