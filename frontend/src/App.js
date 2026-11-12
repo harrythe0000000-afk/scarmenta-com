@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -26,6 +26,7 @@ import AdminReferrals from "@/pages/admin/Referrals";
 import UserRewards from "@/pages/user/Rewards";
 import AdminLossRewards from "@/pages/admin/LossRewards";
 import AdminMoneyFlow from "@/pages/admin/MoneyFlow";
+import AccountSettings from "@/pages/AccountSettings";
 
 const USER_NAV = [
   { id: "user-overview", to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
@@ -49,6 +50,7 @@ const ADMIN_NAV = [
   { id: "admin-loss-rewards", to: "/admin/loss-rewards", label: "Loss Rewards", icon: Award },
   { id: "admin-fraud", to: "/admin/fraud", label: "Fraud Monitor", icon: ShieldAlert },
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
+  { id: "admin-account", to: "/admin/account", label: "My Account", icon: UserCog },
   { id: "admin-settings", to: "/admin/settings", label: "Credit Config", icon: Settings2 },
 ];
 
@@ -82,6 +84,7 @@ function App() {
             <Route path="referrals" element={<AdminReferrals />} />
             <Route path="loss-rewards" element={<AdminLossRewards />} />
             <Route path="money-flow" element={<AdminMoneyFlow />} />
+            <Route path="account" element={<AccountSettings />} />
             <Route path="fraud" element={<AdminFraud />} />
             <Route path="support" element={<AdminSupport />} />
             <Route path="settings" element={<AdminSettings />} />

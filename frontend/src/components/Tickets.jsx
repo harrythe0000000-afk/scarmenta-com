@@ -35,7 +35,7 @@ export const TicketThread = ({ ticket, onReply, viewerRole }) => {
             <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`} data-testid={`ticket-message-${i}`}>
               <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${mine ? "bg-purple-600/25 text-purple-50 border border-purple-500/30" : "bg-white/[0.04] text-slate-200 border border-white/5"}`}>
                 <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  {m.author_role === "admin" ? "Squarement Support" : m.author_name} · {fmtDate(m.created_at)}
+                  {m.author_role === "admin" ? "Scarmenta Support" : m.author_name} · {fmtDate(m.created_at)}
                 </p>
                 <p className="whitespace-pre-wrap">{m.message}</p>
               </div>

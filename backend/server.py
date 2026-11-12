@@ -90,6 +90,13 @@ class OtpVerifyIn(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class AccountIn(BaseModel):
+    current_password: str
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    email: Optional[EmailStr] = None
+    new_password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
 class TokenIn(BaseModel):
     token: str
 
@@ -303,6 +310,42 @@ async def logout(response: Response):
 @api.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+
+@api.put("/auth/account")
+async def update_account(body: AccountIn, response: Response, user: dict = Depends(get_current_user)):
+    ident = f"account:{user['id']}"
+    att = await db.login_attempts.find_one({"identifier": ident})
+    if att and att.get("locked_until") and att["locked_until"] > now_iso():
+        raise HTTPException(status_code=429, detail="Too many wrong passwords. Try again in 15 minutes.")
+    full = await db.users.find_one({"id": user["id"]})
+    if not verify_password(body.current_password, full["password_hash"]):
+        count = (att or {}).get("count", 0) + 1
+        update = {"count": 0, "locked_until": (now() + timedelta(minutes=15)).isoformat()} if count >= 5 else {"count": count}
+        await db.login_attempts.update_one({"identifier": ident}, {"$set": update}, upsert=True)
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    await db.login_attempts.delete_one({"identifier": ident})
+    changes: dict = {}
+    if body.name and body.name.strip() != full["name"]:
+        changes["name"] = body.name.strip()
+    new_email = body.email.lower() if body.email else None
+    if new_email and new_email != full["email"]:
+        if await db.users.find_one({"email": new_email}):
+            raise HTTPException(status_code=400, detail="An account with this email already exists")
+        changes["email"] = new_email
+        if full["role"] != "admin":
+            changes["email_verified"] = False
+    if body.new_password:
+        changes["password_hash"] = hash_password(body.new_password)
+    if not changes:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    changes["updated_at"] = now_iso()
+    updated = await db.users.find_one_and_update({"id": user["id"]}, {"$set": changes},
+                                                 projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    if "email" in changes and full["role"] != "admin":
+        await send_verification(updated)
+    set_auth_cookies(response, updated)
+    return updated
 
 
 @api.post("/auth/refresh")
@@ -663,7 +706,7 @@ async def seed() -> None:
     if not await db.settings.find_one({"key": "platform"}):
         await db.settings.insert_one({"key": "platform", **DEFAULT_SETTINGS})
     admin_email = os.environ["ADMIN_EMAIL"].lower()
-    if not await db.users.find_one({"email": admin_email}):
+    if not await db.users.find_one({"role": "admin"}):
         await db.users.insert_one({"id": new_id(), "email": admin_email, "name": "Platform Admin",
                                    "password_hash": hash_password(os.environ["ADMIN_PASSWORD"]), "role": "admin",
                                    "status": "active", "email_verified": True,
