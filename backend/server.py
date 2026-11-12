@@ -85,6 +85,8 @@ class RegisterIn(BaseModel):
     country: Optional[str] = Field(default=None, max_length=60)
     referral_code: Optional[str] = Field(default=None, max_length=20)
     agent_code: Optional[str] = Field(default=None, max_length=20)
+    accepted_terms: bool = False
+    terms_version: Optional[str] = Field(default=None, max_length=20)
 
 
 class LoginIn(BaseModel):
@@ -228,6 +230,8 @@ async def send_verification(user: dict, base_url: str) -> bool:
 # ---------- Auth ----------
 @api.post("/auth/register")
 async def register(body: RegisterIn, request: Request, response: Response):
+    if not body.accepted_terms:
+        raise HTTPException(status_code=400, detail="You must accept the Terms & Conditions to register")
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -248,7 +252,8 @@ async def register(body: RegisterIn, request: Request, response: Response):
             "email_verified": False, "promo_balance": 0.0, "referral_code": await unique_referral_code(),
             "referred_by": referrer["id"] if referrer else None,
             "referred_by_email": referrer["email"] if referrer else None,
-            "agent_id": agent["id"] if agent else None, "created_at": now_iso()}
+            "agent_id": agent["id"] if agent else None, "created_at": now_iso(),
+            "terms_accepted_at": now_iso(), "terms_version": body.terms_version}
     await db.users.insert_one(user)
     sent = await send_verification(user, site_url(request))
     set_auth_cookies(response, user)

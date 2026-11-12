@@ -50,3 +50,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Account transfer: player → own other player account (proved by its password), fee transfer_fee_percent (default 5%), ledger transfer_out/transfer_in, /api/admin/transfers.
 - Admin login links removed from /login and footer; admins use /admin (→ /admin/login) or /login.
 - Declined (again): "potential earning up to 50%" package line — misleading for non-withdrawable credits.
+
+## 2026-11-12 Terms & Conditions
+- Signup par scrollable T&C box; poora scroll karne ke baad hi accept checkbox enable hota hai
+- Public /terms page; content frontend/src/lib/terms.js me (effective 12 Nov 2026, support@scarmenta.com)
+- Section 4 transfer line updated: transfers allowed only via official Transfer feature with 5% fee
+- Backend /api/auth/register rejects accepted_terms=false; stores terms_accepted_at + terms_version on user

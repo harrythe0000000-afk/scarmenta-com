@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
 import { homeFor, isTeam } from "@/lib/roles";
+import { TermsContent } from "@/components/TermsContent";
+import { TERMS_VERSION } from "@/lib/terms";
 
 const AuthLayout = ({ title, subtitle, children, footer }) => (
   <div className="relative grid min-h-screen bg-[#05040A] lg:grid-cols-2">
@@ -52,6 +54,31 @@ const SubmitBtn = ({ busy, children, testId }) => (
     {children}
   </Button>
 );
+
+const TermsAccept = ({ scrolled, onScrolled, checked, onChange }) => {
+  const onScroll = (e) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 12) onScrolled();
+  };
+  return (
+    <div className="space-y-3" data-testid="register-terms-block">
+      <p className="text-xs uppercase tracking-wider text-slate-400">Terms & Conditions</p>
+      <div onScroll={onScroll} data-testid="register-terms-scrollbox"
+        className="h-56 overflow-y-auto rounded-xl border border-purple-500/20 bg-black/40 p-4">
+        <TermsContent />
+      </div>
+      <p className="text-xs text-slate-500" data-testid="register-terms-hint">
+        {scrolled ? "Thanks for reading. You can now accept the terms." : "Scroll to the end of the terms to enable acceptance."}
+        {" "}<Link to="/terms" target="_blank" className="text-purple-300 hover:text-purple-200" data-testid="register-terms-link">Open full page</Link>
+      </p>
+      <label className={`flex items-start gap-3 text-xs ${scrolled ? "text-slate-300" : "text-slate-600"}`}>
+        <input type="checkbox" disabled={!scrolled} checked={checked} onChange={(e) => onChange(e.target.checked)}
+          data-testid="register-terms-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500 disabled:cursor-not-allowed" />
+        I have read and agree to the Scarmenta Terms & Conditions, including the credit usage, non-withdrawal and refund policies, and understand no winnings or profits are guaranteed.
+      </label>
+    </div>
+  );
+};
 
 const ErrorText = ({ error, testId }) => error ? <p data-testid={testId} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p> : null;
 
@@ -202,15 +229,18 @@ export const Register = () => {
   const [params] = useSearchParams();
   const [form, setForm] = useState({ name: "", email: "", password: "", country: "", referral_code: params.get("ref") || "", agent_code: params.get("agent") || "" });
   const [agree, setAgree] = useState(false);
+  const [termsRead, setTermsRead] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submit = async (e) => {
     e.preventDefault();
     if (!agree) return setError("Please confirm you are 18+ and in an authorized jurisdiction.");
+    if (!acceptTerms) return setError("Please read the Terms & Conditions to the end and accept them.");
     setBusy(true);
     setError("");
     try {
-      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null });
+      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null, accepted_terms: true, terms_version: TERMS_VERSION });
       toast.success(u.verification_sent ? "Account created — check your inbox to verify your email." : "Account created. Use 'Resend email' to get your verification link.");
       navigate("/app");
     } catch (err) {
@@ -234,6 +264,7 @@ export const Register = () => {
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} data-testid="register-agree-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500" />
           I confirm I am 18+ and located in a jurisdiction where these services are legally authorized.
         </label>
+        <TermsAccept scrolled={termsRead} onScrolled={() => setTermsRead(true)} checked={acceptTerms} onChange={setAcceptTerms} />
         <ErrorText error={error} testId="register-error" />
         <SubmitBtn busy={busy} testId="register-submit-button">Create account</SubmitBtn>
       </form>

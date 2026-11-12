@@ -4,6 +4,7 @@ import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAl
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import Terms from "@/pages/Terms";
 import DashboardShell from "@/components/DashboardShell";
 import Landing from "@/pages/Landing";
 import { Login, Register, ForgotPassword, ResetPassword, VerifyEmail, AdminLogin } from "@/pages/AuthPages";
@@ -76,6 +77,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
