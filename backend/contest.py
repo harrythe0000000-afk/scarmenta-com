@@ -177,3 +177,19 @@ async def delete_theme(tid: str, _: dict = Depends(require_admin)):
     if not r.matched_count:
         raise HTTPException(status_code=404, detail="Theme not found")
     return {"ok": True}
+
+
+@router.get("/contest/unseen-wins")
+async def unseen_wins(user: dict = Depends(get_current_user)):
+    docs = await db.contest_entries.find({"user_id": user["id"], "status": "winner", "winner_seen": {"$ne": True}},
+                                         {"_id": 0}).sort("decided_at", 1).to_list(10)
+    return [entry_out(d) for d in docs]
+
+
+@router.post("/contest/entries/{eid}/seen")
+async def mark_win_seen(eid: str, user: dict = Depends(get_current_user)):
+    r = await db.contest_entries.update_one({"id": eid, "user_id": user["id"], "status": "winner"},
+                                            {"$set": {"winner_seen": True}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"ok": True}

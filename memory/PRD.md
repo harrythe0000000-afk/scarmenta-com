@@ -125,3 +125,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Admin sets theme (title, message, banner image via /admin/banners/image, IST start/end) on /admin/contest; auto shows/hides by dates; latest live theme wins
 - Player contest page shows ThemeBanner; entries tagged theme_title (shown to admin + player)
 - API: GET /api/contest/theme, GET/POST/DELETE /api/admin/contest/themes
+
+## 2026-11-12 Contest winner popup
+- WinnerPopup (confetti, prize, winning screenshot, Share again -> /app/demo-game) shown once per win (winner_seen flag); before admin popups
+- API: GET /api/contest/unseen-wins, POST /api/contest/entries/{id}/seen

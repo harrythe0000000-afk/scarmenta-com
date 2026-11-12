@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { LogOut, MailWarning } from "lucide-react";
@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
 import { TermsReaccept, useTermsRequired } from "@/components/TermsReaccept";
 import { UserPopups } from "@/components/UserPopups";
+import { WinnerPopup } from "@/components/WinnerPopup";
 import { ChatWidget } from "@/components/ChatWidget";
 
 const VerifyBanner = () => {
@@ -39,6 +40,8 @@ const VerifyBanner = () => {
 export default function DashboardShell({ nav: allNav, area }) {
   const { user, logout } = useAuth();
   const [termsRequired, setTermsRequired] = useTermsRequired(user);
+  const [winnersDone, setWinnersDone] = useState(false);
+  const markWinnersDone = useCallback(() => setWinnersDone(true), []);
   const nav = allNav.filter((n) => !n.adminOnly || user?.role === "admin");
   if (user?.role === "staff") area = "Staff Console";
   const navigate = useNavigate();
@@ -92,7 +95,8 @@ export default function DashboardShell({ nav: allNav, area }) {
         <div className={`mx-auto max-w-7xl px-4 py-8 sm:px-8 lg:py-12 ${user?.role === "user" || user?.role === "agent" ? "pb-28 lg:pb-28" : ""}`}>
           {user?.role === "user" && !user.email_verified && <VerifyBanner />}
           {termsRequired && <TermsReaccept onDone={() => setTermsRequired(false)} />}
-          {termsRequired === false && (user?.role === "user" || user?.role === "agent") && <UserPopups />}
+          {termsRequired === false && user?.role === "user" && !winnersDone && <WinnerPopup onDone={markWinnersDone} />}
+          {termsRequired === false && (user?.role === "agent" || (user?.role === "user" && winnersDone)) && <UserPopups />}
           {(user?.role === "user" || user?.role === "agent") && <ChatWidget supportPath={user.role === "agent" ? "/agent/support" : "/app/support"} />}
           <Outlet />
         </div>
