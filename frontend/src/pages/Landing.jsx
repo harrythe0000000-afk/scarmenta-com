@@ -57,12 +57,12 @@ const Hero = ({ config }) => {
             ))}
           </div>
           <h1 className="fade-up d-1 mt-7 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Prepaid gaming credit,<br />
-            <span className="text-gradient">accounted to the cent.</span>
+            Play bigger with a<br />
+            <span className="text-gradient">5X gaming balance.</span>
           </h1>
           <p className="fade-up d-2 mt-6 max-w-xl text-base text-slate-400 sm:text-lg">
-            SquareManta is the technology layer that manages prepaid credit packages, 5X credit allocation and revenue
-            reporting — with fully transparent ledgers and zero service fees.
+            Deposit $100 and play with $500. Squarement gives you a gaming balance five times your deposit, with zero
+            service fees and a transparent ledger for every cent.
           </p>
           <div className="fade-up d-3 mt-9 flex flex-wrap gap-3">
             <Button asChild data-testid="landing-hero-cta-button" className="h-12 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-7 text-base font-semibold hover:from-violet-500 hover:to-fuchsia-500">
@@ -160,7 +160,7 @@ const Trust = () => (
         <p className="label-eyebrow">Compliance first</p>
         <h2 className="mt-3 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">Infrastructure, not influence.</h2>
         <p className="mt-4 text-slate-400">
-          SquareManta provides credit and accounting technology only. We never alter or influence third-party game outcomes.
+          Squarement provides credit and accounting technology only. We never alter or influence third-party game outcomes.
           Prepaid credits are for platform use only and cannot be withdrawn or refunded.
         </p>
       </div>
@@ -189,7 +189,7 @@ export default function Landing() {
       <footer className="border-t border-purple-500/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-10 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <BrandLogo testId="footer-logo-link" />
-          <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} SquareManta Ltd, Limassol, Cyprus.</p>
+          <p className="max-w-xl">18+ only. Play responsibly. Prepaid credits are non-withdrawable. Services are available only where legally authorized. © {new Date().getFullYear()} Squarement Ltd, Limassol, Cyprus.</p>
         </div>
       </footer>
     </div>

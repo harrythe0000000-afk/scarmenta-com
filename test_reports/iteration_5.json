@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 5: SquareManta rebrand + email OTP login + admin payment setup link. Backend: new tests/test_otp_auth.py 10/10 passed (password login regression for admin/user, SM referral codes, OTP no-enumeration, 60s throttle 429, wrong code 401 'Incorrect code', 5 wrong -> 429 + code invalidated, success -> cookies + /auth/me + email_verified true, expired/missing -> 400, bad format 422, suspended -> 403). Regression test_platform_api.py 21/21 passed. Frontend: no 'Aetheria' text on landing, register, all 7 user pages and all 12 admin pages (only the seeded account emails @aetheria.io remain); logo 'S'; statement header 'Issued by SquareManta Ltd'; WhatsApp message says SquareManta; login toggle works; OTP code input keeps digits only, max 6; Use another email / Resend code exist; wrong code shows 'Incorrect code'; a known code (set in mongo) signs the user in and goes to /app; password login sends admin to /admin and user to /app; admin-payment-setup-link goes to /admin/settings. Two issues found: the tab title was stale until I restarted the frontend, and the email provider's 502 error message is replaced by Cloudflare's page.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/otp/request", "issue": "If the email fails to send, the backend returns 502. The Cloudflare ingress replaces a 502 body with its own HTML page, so the user sees 'The origin web server returned an invalid or incomplete response to Cloudflare...' instead of 'Could not send the code right now'. Reproduced live: the email provider returned 429 rate_limited and the UI showed Cloudflare's text. The same applies to the existing 502 in send_email for verification and reset emails."},
+      {"endpoint": "POST /api/auth/otp/verify", "issue": "The suspended check runs after find_one_and_update, so a suspended user's email_verified and last_login_at/last_ip are updated before the 403 is returned. If an OTP doc exists for an email with no user, the response is 403 'Account suspended' (wrong message). Put the user lookup and status check before the update."},
+      {"endpoint": "POST /api/auth/otp/request", "issue": "Timing difference: an unknown email returns at once, while a known email waits for the email send. This allows weak enumeration. Optional: send in the background."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "public/index.html title", "issue": "The dev server kept serving the old template ('Emergent | Fullstack App') after index.html was edited. Fixed by me with 'supervisorctl restart frontend'; it now serves 'SquareManta | Prepaid Gaming Credits'. Restart the frontend after any future index.html change.", "selector": "title", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "OTP send when the email provider fails", "issue": "The Cloudflare HTML error text is shown in otp-error (see backend minor issue).", "affected_selectors": ["[data-testid=otp-error]"]}
+    ],
+    "design_issues": [
+      {"screen": "Sidebar / profile", "issues": ["The seeded accounts still use @aetheria.io emails (admin@aetheria.io, demo@aetheria.io), which are shown in the sidebar and the statement header. The old demo referral code AE843071 still has the AE prefix, so it appears in the WhatsApp share text. This is data, not code; migrate it if the brand must be fully gone."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_otp_auth.py", "/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_otp.xml"],
+  "action_items": [
+    "Return 503 (or 429 when the provider rate-limits) instead of 502 from otp/request and send_email, so Cloudflare does not replace the JSON detail",
+    "otp_verify: check that the user exists and is active before updating email_verified/last_login; return 400 or 401 for a missing user",
+    "Optional: migrate the seeded @aetheria.io emails and the AE-prefixed referral codes if a full rebrand is required (update test_credentials.md too)"
+  ],
+  "critical_code_review_comments": [
+    "otp_verify updates the user before the suspended check (side effect on a rejected login)",
+    "The 502 status is hidden by the ingress; use 503",
+    "OTP brute force is limited to 5 tries per code and 1 code per 60s, so it is acceptable; there is no per-IP limit"
+  ],
+  "updated_files": ["/app/backend/tests/test_otp_auth.py"],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "95% (all flows pass; the 502 error message is hidden by Cloudflare)"},
+  "seed_data_creation": "None kept. TEST_otp users were deleted by id, and the demo OTP docs were deleted. Demo and admin were not modified (except that demo's last_login was updated by logins).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The email provider is rate-limited (429) in preview, so otp/request for demo often returns 502. For the UI OTP test, mock /api/auth/otp/request with page.route and insert a login_otps doc with a bcrypt code_hash via a python helper (/tmp/set_otp.py pattern). The browser_automation env has no bcrypt or pymongo. The OTP throttle uses the created_at of the existing otp doc; delete login_otps for the email to reset it."
+}

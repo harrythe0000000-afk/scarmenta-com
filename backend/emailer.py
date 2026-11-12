@@ -111,7 +111,7 @@ async def send_email(*, to: str, subject: str, html: str) -> str | None:
             logger.warning(f"Email paused: {code} ({e.response.status_code})")
             raise HTTPException(status_code=503, detail="Email is temporarily unavailable")
         logger.error(f"Email send failed: {e.response.status_code} {e.response.text}")
-        raise HTTPException(status_code=502, detail="Failed to send email")
+        raise HTTPException(status_code=503, detail="Failed to send email")
     except Exception as e:
         logger.error(f"Email send error: {e}")
         raise HTTPException(status_code=500, detail="Failed to send email")

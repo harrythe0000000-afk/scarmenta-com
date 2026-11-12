@@ -265,7 +265,7 @@ async def otp_request(body: EmailIn):
     except Exception as exc:
         logger.error("otp email failed for %s: %s", email, exc)
         await db.login_otps.delete_many({"email": email})
-        raise HTTPException(status_code=502, detail="Could not send the code right now. Try again shortly.")
+        raise HTTPException(status_code=503, detail="Could not send the code right now. Try again shortly.")
     return {"ok": True}
 
 
@@ -282,11 +282,14 @@ async def otp_verify(body: OtpVerifyIn, request: Request, response: Response):
         await db.login_otps.update_one({"_id": otp["_id"]}, {"$inc": {"attempts": 1}})
         raise HTTPException(status_code=401, detail="Incorrect code")
     await db.login_otps.delete_many({"email": email})
+    existing = await db.users.find_one({"email": email}, {"_id": 0, "status": 1})
+    if not existing:
+        raise HTTPException(status_code=400, detail="This code has expired. Request a new one.")
+    if existing.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
     user = await db.users.find_one_and_update(
         {"email": email}, {"$set": {"email_verified": True, "last_login_at": now_iso(), "last_ip": client_ip(request)}},
         projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-    if not user or user.get("status") == "suspended":
-        raise HTTPException(status_code=403, detail="Account suspended. Contact support.")
     set_auth_cookies(response, user)
     return user
 
@@ -330,7 +333,7 @@ async def resend_verification(user: dict = Depends(get_current_user)):
     if await db.email_tokens.find_one({"user_id": user["id"], "kind": "verify", "created_at": {"$gte": since}}):
         raise HTTPException(status_code=429, detail="Please wait a minute before requesting another email")
     if not await send_verification(user):
-        raise HTTPException(status_code=502, detail="Could not send email right now. Try again shortly.")
+        raise HTTPException(status_code=503, detail="Could not send email right now. Try again shortly.")
     return {"ok": True}
 
 

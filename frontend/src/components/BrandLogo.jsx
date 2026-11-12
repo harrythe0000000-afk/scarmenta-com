@@ -6,7 +6,7 @@ export const BrandLogo = ({ to = "/", testId = "brand-logo-link" }) => (
       <span className="font-display text-lg font-extrabold text-white">S</span>
     </span>
     <span className="leading-none">
-      <span className="block font-display text-lg font-bold tracking-tight text-white">SquareManta</span>
+      <span className="block font-display text-lg font-bold tracking-tight text-white">Squarement</span>
       <span className="block text-[10px] uppercase tracking-[0.25em] text-purple-300/70">Credit OS</span>
     </span>
   </Link>

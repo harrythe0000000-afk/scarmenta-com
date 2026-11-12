@@ -57,7 +57,7 @@ const ErrorText = ({ error, testId }) => error ? <p data-testid={testId} classNa
 export const Login = () => {
   const [mode, setMode] = useState("password");
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your SquareManta account."
+    <AuthLayout title="Welcome back" subtitle="Sign in to your Squarement account."
       footer={<>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></>}>
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid="login-mode-toggle">
         {[["password", "Password"], ["otp", "Email code (OTP)"]].map(([v, l]) => (
