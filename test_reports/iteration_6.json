@@ -1,0 +1,36 @@
+{
+  "summary": "I tested the Scarmenta rebrand, PUT /api/auth/account, the full admin email/password change in the UI (including a backend restart to check the seed), the player email change, and regressions. 13 of 15 backend tests pass. The 2 failures are minor bugs. The admin UI flow passed: success toast, sidebar showed admin2@aetheria.io, old credentials got 401, new credentials worked, and after `sudo supervisorctl restart backend` there was still only 1 admin (admin2) and no new admin@aetheria.io. The admin was then put back to admin@aetheria.io / Admin@12345 through the UI and login works. Regressions passed: password login, password/OTP toggle, landing calculator $200 -> $1,000.00, deposit dialog opens. Branding checks passed: the tab title is right, favicon.png is linked, the logo PNG has real transparency (RGBA, no checkerboard), eyebrow labels are gold rgb(242,185,75), new referral codes start with SC, 'Scarmenta Support' shows in tickets, and no old brand names show on the landing, login, statement, support or account pages.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/auth/account", "issue": "The 5th wrong current_password returns 401. The lock is saved, but 429 only comes back from the 6th attempt (codes seen: 401 x5, then 429). The spec, and /auth/login, return 429 on the 5th. Fix: raise 429 when count >= 5 in update_account."},
+      {"endpoint": "PUT /api/auth/account", "issue": "A name made only of spaces (e.g. '   ') passes min_length=2, is then stripped to '' and saved as an empty name (200). Fix: validate after strip, e.g. a field_validator, or return 422 if not body.name.strip()."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Statement / Admin Transactions CSV export", "issues": ["The CSV download filenames still use the old brand: 'squaremanta-statement-YYYY-MM-DD.csv' (pages/user/Statement.jsx:16) and 'squaremanta-ledger-YYYY-MM-DD.csv' (pages/admin/Transactions.jsx:15). Rename them to scarmenta-*."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_account_update.py", "/app/test_reports/pytest/pytest_account.xml"],
+  "action_items": [
+    "Rename the CSV export filenames from squaremanta-* to scarmenta-* in Statement.jsx and admin/Transactions.jsx",
+    "update_account: return 429 on the 5th wrong current_password, as /auth/login does",
+    "update_account: reject names that are blank after strip()"
+  ],
+  "critical_code_review_comments": [
+    "update_account: changing the password does not invalidate other sessions. Existing refresh tokens (7 days) on other devices stay valid. Consider a token_version or password_changed_at claim check.",
+    "update_account: the return value of send_verification is ignored when a player changes their email. If the email fails to send, the user gets no feedback (email_verified=false, so deposits are blocked). Return a verification_sent flag as register does.",
+    "Admin email changes skip re-verification by design (email_verified is kept). Acceptable, but note that a typo in the new email could lock the admin out (no confirmation step).",
+    "Seed now creates an admin only if no admin exists. This was verified after a restart."
+  ],
+  "updated_files": ["/app/backend/tests/test_account_update.py"],
+  "success_rate": {"backend": "87% (13/15)", "frontend": "100%"},
+  "seed_data_creation": "TEST_ users (test_acct_*/test_new_*@example.com) were created by the pytest file and deleted by id. The demo account was not modified; the player email-change path was tested on a TEST_ user. Admin credentials were changed and then restored (admin@aetheria.io / Admin@12345, email_verified true). Demo is unchanged (email_verified true).",
+  "test_credentials": "admin@aetheria.io / Admin@12345, demo@aetheria.io / Demo@12345 (both verified working at the end)",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_account_update.py -v (pytest.ini adds xdist). The test_fifth_wrong_returns_429 and test_whitespace_name_rejected tests fail until the main agent fixes those 2 bugs. The login mode toggle buttons are login-mode-password / login-mode-otp (login-mode-toggle is the container). Landing calculator testids: landing-calc-amount-input / landing-calc-credits."
+}

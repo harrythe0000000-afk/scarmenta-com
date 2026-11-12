@@ -323,9 +323,13 @@ async def update_account(body: AccountIn, response: Response, user: dict = Depen
         count = (att or {}).get("count", 0) + 1
         update = {"count": 0, "locked_until": (now() + timedelta(minutes=15)).isoformat()} if count >= 5 else {"count": count}
         await db.login_attempts.update_one({"identifier": ident}, {"$set": update}, upsert=True)
+        if count >= 5:
+            raise HTTPException(status_code=429, detail="Too many wrong passwords. Try again in 15 minutes.")
         raise HTTPException(status_code=401, detail="Current password is incorrect")
     await db.login_attempts.delete_one({"identifier": ident})
     changes: dict = {}
+    if body.name is not None and not body.name.strip():
+        raise HTTPException(status_code=422, detail="Name cannot be blank")
     if body.name and body.name.strip() != full["name"]:
         changes["name"] = body.name.strip()
     new_email = body.email.lower() if body.email else None

@@ -36,3 +36,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## Backlog
 - P1: Real provider contracts → set launch URLs + hand over keys; change-password / multiple admin accounts; per-game catalog
 - P2: Auto-verify USDT via blockchain explorer; scheduled weekly loss-reward run; shadcn date picker
+
+## Update — Brand Scarmenta + account settings + OTP
+- Brand renamed to Scarmenta; AI-generated manta-ray logo at /frontend/public/scarmenta-logo.png (+ favicon.png); gold accent (#F2B94B) added from the logo.
+- Email OTP login (6-digit, 10 min, 5 attempts, 60s resend limit).
+- PUT /api/auth/account: change name / login email / password (current password required, 5-try lock). Admin page /admin/account.
+- Seed creates the admin only if NO admin exists (so a changed admin email is never re-created from env).
+- Not built: "potential earning" package claims and the opposite-betting homepage section (misleading); Stripe (does not allow gambling businesses).

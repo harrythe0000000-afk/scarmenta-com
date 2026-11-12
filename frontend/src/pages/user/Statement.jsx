@@ -13,7 +13,7 @@ export default function UserStatement() {
   return (
     <>
       <PageHeader eyebrow="Account statement" title="Transaction ledger" desc={`${user?.name} · ${user?.email} · Issued by Scarmenta Ltd, Cyprus`}
-        action={<StatementActions rows={data} name={`squaremanta-statement-${new Date().toISOString().slice(0, 10)}.csv`} />} />
+        action={<StatementActions rows={data} name={`scarmenta-statement-${new Date().toISOString().slice(0, 10)}.csv`} />} />
       <TxFilters filters={filters} setFilters={setFilters} />
       <TotalsBar totals={totals} count={data?.length || 0} />
       <TxTable rows={data} testId="statement-tx-table" />

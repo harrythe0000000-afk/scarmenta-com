@@ -12,7 +12,7 @@ export default function AdminTransactions() {
   return (
     <>
       <PageHeader eyebrow="Transaction monitoring" title="Platform ledger" desc="Every credit allocation and manual adjustment across all accounts."
-        action={<StatementActions rows={data} name={`squaremanta-ledger-${new Date().toISOString().slice(0, 10)}.csv`} />} />
+        action={<StatementActions rows={data} name={`scarmenta-ledger-${new Date().toISOString().slice(0, 10)}.csv`} />} />
       <TxFilters filters={filters} setFilters={setFilters}
         extra={
           <div>
