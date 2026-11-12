@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState, PageHeader } from "@/components/StatCard";
 import { useAuth } from "@/context/AuthContext";
+import { ThemeManager } from "@/components/ContestTheme";
 import { contestImg } from "@/pages/user/Contest";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
@@ -32,6 +33,7 @@ const EntryCard = ({ e, canPay, reload, onZoom }) => {
       <div className="space-y-2 p-4">
         <p className="font-semibold text-white">{e.name}</p>
         <p className="text-xs text-slate-500">{e.user_email} · {fmtDate(e.created_at)}</p>
+        {e.theme_title && <p className="inline-block rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300" data-testid={`admin-contest-theme-${e.id}`}>{e.theme_title}</p>}
         {e.caption && <p className="text-sm text-slate-300">“{e.caption}”</p>}
         {e.status === "winner" && <p className="text-sm text-emerald-300">Paid {usd(e.bonus)}</p>}
         {e.status === "rejected" && <p className="text-sm text-slate-400">Rejected{e.note ? `: ${e.note}` : ""}</p>}
@@ -69,6 +71,7 @@ export default function AdminContest() {
     <>
       <PageHeader eyebrow="Growth" title="Promo contest" desc="Review players' share screenshots and pick winners for bonus credits. Credits are added to the winner's balance right away." />
       {user?.role !== "admin" && <p className="mb-4 text-xs text-amber-300" data-testid="admin-contest-staff-note">Only the admin can pay winners. You can review and reject entries.</p>}
+      <ThemeManager canEdit={user?.role === "admin"} />
       <Tabs value={status} onValueChange={setStatus}>
         <TabsList className="mb-6 bg-black/40" data-testid="admin-contest-tabs">
           {["pending", "winner", "rejected"].map((s) => (

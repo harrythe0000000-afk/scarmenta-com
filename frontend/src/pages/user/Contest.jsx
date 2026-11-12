@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/StatCard";
 import { api, API, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { fmtDate, usd } from "@/lib/format";
+import { ThemeBanner } from "@/components/ContestTheme";
 
 export const contestImg = (id) => `${API}/contest/image/${id}`;
 const STATUS = {
@@ -72,7 +73,7 @@ const MyEntries = ({ items }) => (
             <img src={contestImg(e.id)} alt="" className="h-32 w-full object-cover" />
             <div className="space-y-1 p-2">
               <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS[e.status][1]}`} data-testid={`contest-entry-status-${e.id}`}>{STATUS[e.status][0]}{e.status === "winner" ? ` · ${usd(e.bonus)}` : ""}</span>
-              <p className="text-[11px] text-slate-500">{fmtDate(e.created_at)}</p>
+              <p className="text-[11px] text-slate-500">{fmtDate(e.created_at)}{e.theme_title ? ` · ${e.theme_title}` : ""}</p>
             </div>
           </div>
         ))}
@@ -103,9 +104,11 @@ export const WinnersGallery = ({ items }) => (
 export default function Contest() {
   const mine = useFetch("/contest/me");
   const wins = useFetch("/contest/winners");
+  const theme = useFetch("/contest/theme");
   return (
     <>
       <PageHeader eyebrow="Promo contest" title="Share & win bonus credits" desc="Post your Hot Streak image, upload a screenshot, and each week our team picks winners who get bonus credits." />
+      {theme.data && <ThemeBanner theme={theme.data} />}
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         <UploadBox onDone={mine.reload} />
         <MyEntries items={mine.data || []} />

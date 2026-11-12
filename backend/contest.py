@@ -1,6 +1,7 @@
 import asyncio
 import io
 import logging
+from datetime import datetime
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -9,7 +10,7 @@ from PIL import Image
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
-from content import APP_NAME, MAX_IMAGE, MIME, get_object, put_object
+from content import APP_NAME, MAX_IMAGE, MIME, get_object, put_object, utc_iso
 from core import db, get_current_user, make_tx, new_id, now_iso, require_admin, require_staff
 from rewards import _mask
 
@@ -19,7 +20,7 @@ TEAM = ("admin", "staff")
 
 
 def entry_out(e: dict, full: bool = False) -> dict:
-    keys = ["id", "caption", "status", "bonus", "created_at", "decided_at"]
+    keys = ["id", "caption", "status", "bonus", "created_at", "decided_at", "theme_title"]
     out = {k: e.get(k) for k in keys}
     out["name"] = e["user_name"] if full else _mask(e["user_name"])
     if full:
@@ -43,6 +44,7 @@ async def submit_entry(file: UploadFile = File(...), caption: Optional[str] = Fo
     except Exception:
         raise HTTPException(status_code=400, detail="This file is not a valid image")
     eid = new_id()
+    theme = await current_theme()
     try:
         res = await asyncio.to_thread(put_object, f"{APP_NAME}/contest/{eid}.{ext}", data, MIME[ext])
     except Exception as e:
@@ -50,7 +52,8 @@ async def submit_entry(file: UploadFile = File(...), caption: Optional[str] = Fo
         raise HTTPException(status_code=502, detail="Upload failed. Please try again.")
     doc = {"id": eid, "user_id": user["id"], "user_name": user["name"], "user_email": user["email"],
            "storage_path": res["path"], "content_type": MIME[ext], "caption": (caption or "").strip() or None,
-           "status": "pending", "bonus": 0, "created_at": now_iso(), "decided_at": None}
+           "status": "pending", "bonus": 0, "created_at": now_iso(), "decided_at": None,
+           "theme_id": theme["id"] if theme else None, "theme_title": theme["title"] if theme else None}
     await db.contest_entries.insert_one(dict(doc))
     return entry_out(doc)
 
@@ -120,4 +123,57 @@ async def reject_entry(eid: str, body: RejectIn, admin: dict = Depends(require_s
                                                       "decided_by": admin["email"]}})
     if not r.matched_count:
         raise HTTPException(status_code=400, detail="This entry was already reviewed")
+    return {"ok": True}
+
+
+class ThemeIn(BaseModel):
+    title: str = Field(min_length=2, max_length=80)
+    message: str = Field(default="", max_length=500)
+    image_id: Optional[str] = None
+    starts_at: datetime
+    ends_at: datetime
+
+
+def theme_out(t: dict) -> dict:
+    return {k: t.get(k) for k in ("id", "title", "message", "image_id", "starts_at", "ends_at", "created_at")}
+
+
+async def current_theme() -> Optional[dict]:
+    ts = now_iso()
+    return await db.contest_themes.find_one({"deleted": {"$ne": True}, "starts_at": {"$lte": ts}, "ends_at": {"$gt": ts}},
+                                            {"_id": 0}, sort=[("created_at", -1)])
+
+
+@router.get("/contest/theme")
+async def get_theme(_: dict = Depends(get_current_user)):
+    t = await current_theme()
+    return theme_out(t) if t else None
+
+
+@router.get("/admin/contest/themes")
+async def list_themes(_: dict = Depends(require_staff)):
+    docs = await db.contest_themes.find({"deleted": {"$ne": True}}, {"_id": 0}).sort("starts_at", -1).to_list(100)
+    return [theme_out(d) for d in docs]
+
+
+@router.post("/admin/contest/themes")
+async def create_theme(body: ThemeIn, admin: dict = Depends(require_admin)):
+    starts, ends = utc_iso(body.starts_at), utc_iso(body.ends_at)
+    if ends <= starts:
+        raise HTTPException(status_code=400, detail="End time must be after start time")
+    if ends <= now_iso():
+        raise HTTPException(status_code=400, detail="End time is already in the past")
+    if body.image_id and not await db.files.find_one({"id": body.image_id, "is_deleted": False}):
+        raise HTTPException(status_code=400, detail="Uploaded image not found")
+    doc = {"id": new_id(), "title": body.title.strip(), "message": body.message.strip(), "image_id": body.image_id,
+           "starts_at": starts, "ends_at": ends, "created_by": admin["email"], "created_at": now_iso(), "deleted": False}
+    await db.contest_themes.insert_one(dict(doc))
+    return theme_out(doc)
+
+
+@router.delete("/admin/contest/themes/{tid}")
+async def delete_theme(tid: str, _: dict = Depends(require_admin)):
+    r = await db.contest_themes.update_one({"id": tid}, {"$set": {"deleted": True}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Theme not found")
     return {"ok": True}

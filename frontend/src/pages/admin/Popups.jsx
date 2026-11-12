@@ -26,7 +26,7 @@ const phase = (b) => {
 };
 const inputCls = "border-purple-500/20 bg-black/40";
 
-const ImagePicker = ({ imageId, onChange }) => {
+export const ImagePicker = ({ imageId, onChange }) => {
   const [busy, setBusy] = useState(false);
   const pick = async (e) => {
     const file = e.target.files?.[0];

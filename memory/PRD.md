@@ -120,3 +120,8 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Players /app/contest: upload share screenshot (object storage, no limit), my entries status, winners gallery (masked)
 - Admin/staff /admin/contest: pending/winners/rejected; admin enters bonus per winner -> promo_balance + tx contest_bonus (ref CON-xxxxxx); staff can reject only
 - backend/contest.py; tests iteration_19.json pass
+
+## 2026-11-12 Contest theme of the week
+- Admin sets theme (title, message, banner image via /admin/banners/image, IST start/end) on /admin/contest; auto shows/hides by dates; latest live theme wins
+- Player contest page shows ThemeBanner; entries tagged theme_title (shown to admin + player)
+- API: GET /api/contest/theme, GET/POST/DELETE /api/admin/contest/themes
