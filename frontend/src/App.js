@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -34,6 +34,7 @@ import AdminAgents from "@/pages/admin/Agents";
 import AdminPopups from "@/pages/admin/Popups";
 import AdminChatInsights from "@/pages/admin/ChatInsights";
 import AdminBotAnswers from "@/pages/admin/BotAnswers";
+import AdminTopSharers from "@/pages/admin/TopSharers";
 import UserTransfer from "@/pages/user/Transfer";
 import UserCalculator from "@/pages/user/Calculator";
 import UserLeaderboard from "@/pages/user/Leaderboard";
@@ -73,6 +74,7 @@ const ADMIN_NAV = [
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
   { id: "admin-agents", to: "/admin/agents", label: "Agents", icon: Handshake },
   { id: "admin-chat-insights", to: "/admin/chat-insights", label: "Chat Insights", icon: MessagesSquare },
+  { id: "admin-top-sharers", to: "/admin/top-sharers", label: "Top Sharers", icon: Share2, adminOnly: true },
   { id: "admin-bot-answers", to: "/admin/bot-answers", label: "Bot Answers", icon: BotMessageSquare },
   { id: "admin-popups", to: "/admin/popups", label: "Popups & Terms", icon: Megaphone, adminOnly: true },
   { id: "admin-staff", to: "/admin/staff", label: "Staff", icon: ShieldCheck, adminOnly: true },
@@ -125,6 +127,7 @@ function App() {
             <Route path="agents" element={<AdminAgents />} />
             <Route path="chat-insights" element={<AdminChatInsights />} />
             <Route path="bot-answers" element={<AdminBotAnswers />} />
+            <Route path="top-sharers" element={<ProtectedRoute role="owner"><AdminTopSharers /></ProtectedRoute>} />
             <Route path="popups" element={<ProtectedRoute role="owner"><AdminPopups /></ProtectedRoute>} />
           </Route>
           <Route path="/agent" element={<ProtectedRoute role="agent"><DashboardShell nav={AGENT_NAV} area="Agent Portal" /></ProtectedRoute>}>

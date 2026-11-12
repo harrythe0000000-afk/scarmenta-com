@@ -1,12 +1,14 @@
 import hashlib
 from datetime import timedelta
-from typing import Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
-from core import client_ip, now, db, site_url, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
+from core import (client_ip, now, db, site_url, get_current_user, get_settings, make_tx, new_id, now_iso,
+                  require_admin, require_staff, unique_referral_code)
+from rewards import _mask
 
 router = APIRouter(prefix="/api")
 
@@ -118,3 +120,69 @@ async def admin_referrals(status: Optional[str] = None, _: dict = Depends(requir
                                    "referral_rewarded": 1, "referral_reward": 1}).sort("created_at", -1).to_list(1000)
     return [{**r, "status": "earning" if r.get("referral_rewarded") else "pending",
              "reward": r.get("referral_reward", 0)} for r in rows]
+
+
+async def _top_sharers(limit: int = 10) -> tuple:
+    since = (now() - timedelta(days=7)).isoformat()
+    rows = await db.users.aggregate([
+        {"$match": {"signup_source": "calc_share", "referred_by": {"$ne": None}, "created_at": {"$gte": since}}},
+        {"$group": {"_id": "$referred_by", "friends": {"$sum": 1}, "first": {"$min": "$created_at"}}},
+        {"$sort": {"friends": -1, "first": 1}}]).to_list(100000)
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": [r["_id"] for r in rows]}, "role": "user"},
+                                                     {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(100000)}
+    ranked = [{"user_id": r["_id"], "friends": r["friends"], "name": users[r["_id"]]["name"],
+               "email": users[r["_id"]]["email"]} for r in rows if r["_id"] in users]
+    for i, r in enumerate(ranked):
+        r["rank"] = i + 1
+    return since, ranked
+
+
+@router.get("/leaderboard/sharers")
+async def sharer_leaderboard(user: dict = Depends(get_current_user)):
+    since, ranked = await _top_sharers()
+    mine = next((r for r in ranked if r["user_id"] == user["id"]), None)
+    return {"start": since, "end": now_iso(), "players": len(ranked),
+            "top": [{"rank": r["rank"], "name": _mask(r["name"]), "friends": r["friends"],
+                     "is_me": r["user_id"] == user["id"]} for r in ranked[:10]],
+            "me": {"rank": mine["rank"], "friends": mine["friends"]} if mine else None}
+
+
+class SharerRewardIn(BaseModel):
+    amounts: List[float] = Field(min_length=1, max_length=3)
+
+
+@router.get("/admin/sharers")
+async def admin_sharers(_: dict = Depends(require_admin)):
+    since, ranked = await _top_sharers()
+    runs = await db.sharer_reward_runs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    return {"start": since, "end": now_iso(), "top": ranked[:10], "runs": runs}
+
+
+@router.post("/admin/sharers/reward")
+async def reward_sharers(body: SharerRewardIn, admin: dict = Depends(require_admin)):
+    if any(a < 0 or a > 10000 for a in body.amounts) or not any(a > 0 for a in body.amounts):
+        raise HTTPException(status_code=400, detail="Enter bonus amounts between $0 and $10,000")
+    last = await db.sharer_reward_runs.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
+    if last and last["created_at"] > (now() - timedelta(days=7)).isoformat():
+        raise HTTPException(status_code=400, detail="Top sharers were already rewarded in the last 7 days")
+    since, ranked = await _top_sharers()
+    if not ranked:
+        raise HTTPException(status_code=400, detail="No sharers to reward this week")
+    run_id, winners = new_id(), []
+    for r, amt in zip(ranked, body.amounts):
+        amt = round(amt, 2)
+        if amt <= 0:
+            continue
+        u = await db.users.find_one_and_update({"id": r["user_id"]}, {"$inc": {"promo_balance": amt}},
+                                               projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+        if not u:
+            continue
+        await db.transactions.insert_one(make_tx(u, "sharer_reward", "credit", amt,
+                                                 f"Top sharer #{r['rank']} this week ({r['friends']} friends joined)",
+                                                 run_id, u["promo_balance"]))
+        winners.append({"rank": r["rank"], "user_id": u["id"], "name": u["name"], "email": u["email"],
+                        "friends": r["friends"], "amount": amt})
+    run = {"id": run_id, "period_start": since, "period_end": now_iso(), "winners": winners,
+           "total": round(sum(w["amount"] for w in winners), 2), "created_by": admin["email"], "created_at": now_iso()}
+    await db.sharer_reward_runs.insert_one(dict(run))
+    return run
