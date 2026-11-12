@@ -98,6 +98,7 @@ async def ticket_from_chat(user: dict, session_id: str, m: re.Match, past: list,
     subject = (m.group(1).strip() or "Help requested via chat")[:110]
     t = new_ticket(user, subject, category, f"Opened by the AI assistant. Chat so far:\n{transcript}",
                    chat_session_id=session_id, source="assistant")
+    t["messages"][0]["author_name"] = f"Scara AI (for {user['name']})"
     await db.tickets.insert_one(dict(t))
     return t
 
@@ -115,14 +116,14 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="The assistant is available for players and agents only")
     if not SESSION_RE.match(body.session_id):
         raise HTTPException(status_code=400, detail="Invalid session")
+    since = (now() - timedelta(minutes=RATE_WINDOW_MIN)).isoformat()
+    if await db.chat_messages.count_documents({"user_id": user["id"], "role": "user", "created_at": {"$gt": since}}) >= RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="You're sending messages too fast. Please wait a few minutes.")
     past = await db.chat_messages.find({"user_id": user["id"], "session_id": body.session_id},
                                        {"_id": 0, "role": 1, "content": 1}).sort("created_at", -1).to_list(HISTORY_LIMIT)
     llm = LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=body.session_id, system_message="",
                   initial_messages=[{"role": "system", "content": await system_prompt(user)}, *reversed(past)]
                   ).with_model(*MODEL)
-    since = (now() - timedelta(minutes=RATE_WINDOW_MIN)).isoformat()
-    if await db.chat_messages.count_documents({"user_id": user["id"], "role": "user", "created_at": {"$gt": since}}) >= RATE_LIMIT:
-        raise HTTPException(status_code=429, detail="You're sending messages too fast. Please wait a few minutes.")
     text = body.message.strip()
     asked_at = now_iso()
 
@@ -133,7 +134,8 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
                 if isinstance(ev, TextDelta):
                     reply += ev.content
                     cut = reply.find("[[")
-                    safe = cut if cut >= 0 else len(reply) - (1 if reply.endswith("[") else 0)
+                    head = reply[:cut] if cut >= 0 else reply[:len(reply) - (1 if reply.endswith("[") else 0)]
+                    safe = len(head.rstrip())
                     if safe > sent:
                         yield f"data: {json.dumps({'delta': reply[sent:safe]})}\n\n"
                         sent = safe
@@ -170,7 +172,8 @@ you your we our it its this that these those what which who whom how why when wh
 have has had not no yes please hi hello hey ok okay thanks thank kya hai hain ho hoga kaise kaisa kab kahan kyu kyun mera meri
 mere mujhe main mai hum aap ap tum ka ki ke ko se me mein par pe aur ya bhi nahi na toh to tha thi the kar karna karu karo
 karein kuch koi ek bata batao btao sakta sakte sakti raha rahi rahe chahiye wala wali wale abhi gaya gayi karni
-kisi hoon baat maine poocha kitni kitna kitne kab tak liye sab work want need help get""".split())
+kisi hoon baat maine poocha kitni kitna kitne kab tak liye sab work want need help get never ago got many
+much days day still yet already just also any some very really more most one two three din""".split())
 
 
 @router.get("/admin/assistant/insights")
@@ -183,7 +186,7 @@ async def insights(days: int = Query(default=30, ge=1, le=365), _: dict = Depend
     for q in qs:
         norm = " ".join(re.findall(r"[\w']+", q["content"].lower()))
         repeats[norm] += 1
-        words.update({w for w in norm.split() if len(w) > 2 and w not in STOP and not w.isdigit()})
+        words.update({w for w in norm.split() if len(w) > 2 and w not in STOP and not any(ch.isdigit() for ch in w)})
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": list({q["user_id"] for q in qs})}},
                                                      {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(5000)}
     return {

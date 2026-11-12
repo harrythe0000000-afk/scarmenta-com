@@ -72,3 +72,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - AI chat "Scara" (backend/assistant.py, GPT 6 Luna gpt-6-luna via EMERGENT_LLM_KEY): floating widget for players only; SSE streaming; multi-turn sessions persisted in chat_messages (session id in localStorage, New chat button); knows platform facts + user account snapshot; 20 msgs / 10 min rate limit
 - Popup stats (unique views/clicks) + IST scheduling added earlier today
 - Tests: iteration_12.json, iteration_13.json pass
+
+## 2026-11-12 Share image, chat handoff, agent chat, chat insights
+- Calculator: Save image / Share on WhatsApp (canvas PNG 1080x1350 with result, chart, referral code + link, disclaimer; Web Share API on mobile, else download + wa.me)
+- Bot auto-opens support ticket via [[TICKET: subject | category]] tag (stripped from stream); one open ticket per chat session; source=assistant, transcript included
+- Agents: chat widget + bot knows agent stats/tier; new /agent/support page
+- Admin/staff /admin/chat-insights: counts, top words (stopwords, no AI), repeated questions, latest 50; 7/30/90 days
+- Tests: iteration_14.json pass

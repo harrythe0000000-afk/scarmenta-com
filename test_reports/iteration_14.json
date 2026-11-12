@@ -1,0 +1,42 @@
+{
+  "summary": "Tested calculator share image, AI chat auto-handoff to tickets (player + agent), agent chat access and Support page, admin/staff Chat Insights, role guards and rate limit, and the manual ticket regression. Backend: 15/15 pytest pass, using about 6 LLM calls. Frontend: all requested flows work. One CRITICAL UI crash was found in ChatWidget and fixed (details below). The fix was checked by sending immediately after 'New chat' as the agent.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/assistant/chat", "issue": "Text streamed before the [[TICKET]] tag keeps its trailing newlines, and then '\\n\\nSupport ticket ...' is added. The live bubble shows 3-4 blank lines before the ticket note. History is clean because the reply is rstripped there. Fix: hold back trailing whitespace while streaming, or lstrip the note."},
+      {"endpoint": "POST /api/assistant/chat", "issue": "LlmChat is built and system_prompt() runs DB aggregations BEFORE the 429 rate-limit check. Move the rate-limit check first. Also, user messages are only saved after the stream ends, so parallel requests can get past the limit."},
+      {"endpoint": "POST /api/assistant/chat", "issue": "When a ticket is reused, the LLM still says 'I'm opening a support ticket' even though no new ticket is made. Wording is slightly misleading but harmless."},
+      {"endpoint": "GET /api/admin/assistant/insights", "issue": "STOP list is missing common filler words, so 'never', 'ago', 'got', 'many', 'days' rank among the top words. Test payment refs like 'upi888' also show up as words."},
+      {"endpoint": "ticket_from_chat", "issue": "The transcript message's author_role/author_name is the player, so the bot-opened ticket shows as written by 'DEMO PLAYER'. The transcript also leaves out the bot's final reply. Cosmetic."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ChatWidget ChatPanel", "issue": "FIXED BY TESTING AGENT. Runtime crash 'Cannot read properties of undefined (reading content)' when a message is sent before the /assistant/history request returns, e.g. right after clicking New chat or on first open. The late history response replaced msgs with [], and patch() then read m[-1].content. Fix: history effect uses a live flag and setMsgs(m => m.length ? m : r.data); patch guards an empty array.", "selector": "[data-testid=chat-new-button], [data-testid=chat-send-button]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Chat ticket toast", "issues": ["Sonner toast at bottom-right sits partly under the chat launcher button; the View action is partly covered. Consider toast position top-center or an offset."]},
+      {"screen": "Share image", "issues": ["Referral link in the image is cut at 67 chars, so on long domains (preview) the ?ref=CODE part is cut off. The code is shown in large text above, so this is minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_chat_handoff_insights.py", "/app/test_reports/pytest/pytest_chat_handoff.xml"],
+  "action_items": [
+    "Review the ChatWidget race-condition fix applied by the testing agent (/app/frontend/src/components/ChatWidget.jsx)",
+    "Trim whitespace before the ticket note in the SSE stream (extra blank lines)",
+    "Move the rate-limit check before building LlmChat/system_prompt",
+    "Optional: extend the insights STOP words; move the toast so it doesn't overlap the launcher"
+  ],
+  "critical_code_review_comments": [
+    "assistant.py events(): if the LLM writes '[[' without a valid tag, everything after it is silently dropped and no ticket is made. Acceptable, but consider logging it.",
+    "Rate-limit count only includes saved messages, so it can be bypassed by concurrent streams.",
+    "ChatWidget uses a localStorage session key shared across roles in the same browser. Data is safe because history/tickets filter by user_id, but the old session id is reused for the new user."
+  ],
+  "updated_files": ["/app/frontend/src/components/ChatWidget.jsx", "/app/backend/tests/test_chat_handoff_insights.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% after fix (1 crash found and fixed)"},
+  "seed_data_creation": "Created test tickets TCK-98AA91, TCK-ED3977, TCK-F46375, TCK-E92154, TCK-623162 and TCK-AD40BF, plus their chat sessions. All were deleted by reference/session id. The pytest normal-question session and the agent commission chat sessions are still in chat_messages (small amount of test chat data that shows in insights). The rate-limit test inserts and then deletes its own 20 docs by id.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_chat_handoff_insights.py -n0 -s (it makes about 6 LLM calls). Note: the tests create tickets, so clean them up by reference afterwards. Verified: share image 1080x1350 has no overlap; the wa.me popup opens with the referral text; toast View goes to /app/support; agent reply was '5%, 1 referred player', matching the dashboard; insights toggle sends days=7/90.",
+  "rca of the issue": "ChatPanel useEffect([session]) fetched history and called setMsgs(r.data) without checking for stale results. If the user sends before the response arrives, msgs [user, assistant-placeholder] is replaced by []. The next stream delta runs patch(), which reads m[m.length-1].content on an empty array, throws, and React unmounts the panel. Reproduced by clicking New chat and sending immediately. Mitigated by a live flag plus not overwriting non-empty msgs, and by guarding patch()."
+}

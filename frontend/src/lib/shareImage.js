@@ -100,7 +100,7 @@ export async function renderShareImage({ amount, rate, days, final, chart, code,
   ctx.fillStyle = "#c084fc";
   ctx.font = "500 24px sans-serif";
   const shown = link.replace(/^https?:\/\//, "");
-  ctx.fillText(shown.length > 70 ? `${shown.slice(0, 67)}…` : shown, 120, 1170);
+  ctx.fillText(shown.length > 70 ? `…${shown.slice(-67)}` : shown, 120, 1170);
 
   ctx.fillStyle = "#64748b";
   ctx.font = "400 22px sans-serif";

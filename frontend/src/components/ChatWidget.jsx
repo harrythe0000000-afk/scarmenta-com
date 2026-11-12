@@ -62,7 +62,10 @@ const ChatPanel = ({ onClose, supportPath }) => {
   const [busy, setBusy] = useState(false);
   const end = useRef(null);
   useEffect(() => {
-    api.get("/assistant/history", { params: { session_id: session } }).then((r) => setMsgs(r.data)).catch(() => {});
+    let live = true;
+    api.get("/assistant/history", { params: { session_id: session } })
+      .then((r) => live && setMsgs((m) => (m.length ? m : r.data))).catch(() => {});
+    return () => { live = false; };
   }, [session]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth" });
@@ -73,11 +76,11 @@ const ChatPanel = ({ onClose, supportPath }) => {
     setText("");
     setBusy(true);
     setMsgs((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
-    const patch = (fn) => setMsgs((m) => [...m.slice(0, -1), { role: "assistant", content: fn(m[m.length - 1].content) }]);
+    const patch = (fn) => setMsgs((m) => (m.length ? [...m.slice(0, -1), { role: "assistant", content: fn(m[m.length - 1].content) }] : m));
     try {
       await streamReply({ session_id: session, message }, (d, ticket) => {
         patch((c) => c + d);
-        if (ticket) toast.success(`Support ticket ${ticket.reference} opened`, { action: { label: "View", onClick: () => navigate(supportPath) } });
+        if (ticket) toast.success(`Support ticket ${ticket.reference} opened`, { position: "top-center", action: { label: "View", onClick: () => navigate(supportPath) } });
       });
     } catch (e) {
       patch((c) => c || e.message);
