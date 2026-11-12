@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
 from core import db, site_url, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
@@ -52,6 +53,50 @@ async def reward_referrer(dep: dict) -> None:
         await db.transactions.insert_one(make_tx(
             referrer, "referral_bonus", "credit", bonus,
             f"Referral income: {s['referral_bonus_percent']:g}% of {mask_name(referee['name'])}'s ${dep['amount']:,.2f} deposit",
+            dep["reference"], referrer["promo_balance"]))
+
+
+class ShareVisitIn(BaseModel):
+    code: str = Field(min_length=3, max_length=20)
+
+
+@router.post("/share/visit")
+async def share_visit(body: ShareVisitIn):
+    ref = await db.users.find_one({"referral_code": body.code.strip().upper(), "role": "user"}, {"_id": 0, "id": 1})
+    if ref:
+        await db.share_visits.insert_one({"referrer_id": ref["id"], "source": "calc_share", "created_at": now_iso()})
+    return {"ok": True}
+
+
+@router.get("/share/me")
+async def share_me(user: dict = Depends(get_current_user)):
+    s = await get_settings()
+    q = {"referred_by": user["id"], "signup_source": "calc_share"}
+    return {"bonus_amount": s.get("share_bonus_amount", 0),
+            "visits": await db.share_visits.count_documents({"referrer_id": user["id"]}),
+            "signups": await db.users.count_documents(q),
+            "deposited": await db.users.count_documents({**q, "share_bonus_paid": True}),
+            "earned": round(user.get("share_earnings", 0), 2)}
+
+
+async def reward_share(dep: dict) -> None:
+    s = await get_settings()
+    bonus = round(float(s.get("share_bonus_amount", 0)), 2)
+    if bonus <= 0:
+        return
+    referee = await db.users.find_one_and_update(
+        {"id": dep["user_id"], "signup_source": "calc_share", "referred_by": {"$ne": None}, "share_bonus_paid": {"$ne": True}},
+        {"$set": {"share_bonus_paid": True, "share_bonus": bonus, "share_bonus_at": now_iso()}},
+        projection={"_id": 0, "name": 1, "referred_by": 1})
+    if not referee:
+        return
+    referrer = await db.users.find_one_and_update(
+        {"id": referee["referred_by"]}, {"$inc": {"promo_balance": bonus, "share_earnings": bonus}},
+        projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    if referrer:
+        await db.transactions.insert_one(make_tx(
+            referrer, "share_bonus", "credit", bonus,
+            f"Share bonus: {mask_name(referee['name'])} joined from your calculator image and made a first deposit",
             dep["reference"], referrer["promo_balance"]))
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Loader2, MessageCircle, Plus, Send, X } from "lucide-react";
+import { Bot, Loader2, MessageCircle, Plus, Send, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { v4 as uuid } from "uuid";
@@ -41,16 +41,39 @@ async function streamReply(body, onDelta) {
       if (!line || line === "[DONE]") continue;
       const ev = JSON.parse(line);
       if (ev.error) throw new Error(ev.error);
-      onDelta(ev.delta, ev.ticket);
+      onDelta(ev);
     }
   }
 }
 
-const Bubble = ({ m }) => (
-  <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+const Rating = ({ m, onRate }) => {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const btn = (v, Icon) => (
+    <button type="button" onClick={() => (v === "down" ? setAsking(true) : onRate(m.id, "up"))} data-testid={`chat-rate-${v}-${m.id}`}
+      className={`rounded p-1 transition-colors ${m.rating === v ? "text-purple-300" : "text-slate-600 hover:text-slate-300"}`} aria-label={v === "up" ? "Helpful" : "Not helpful"}>
+      <Icon className={`h-3.5 w-3.5 ${m.rating === v ? "fill-current" : ""}`} />
+    </button>
+  );
+  if (asking && m.rating !== "down") {
+    return (
+      <form className="mt-1 flex gap-1" data-testid={`chat-rate-reason-form-${m.id}`}
+        onSubmit={(e) => { e.preventDefault(); onRate(m.id, "down", reason); setAsking(false); }}>
+        <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="What was wrong? (optional)" data-testid={`chat-rate-reason-input-${m.id}`}
+          className="h-7 flex-1 rounded-full border border-purple-500/20 bg-black/40 px-3 text-xs text-white outline-none" />
+        <button type="submit" data-testid={`chat-rate-reason-submit-${m.id}`} className="rounded-full bg-purple-600 px-3 text-xs text-white">Send</button>
+      </form>
+    );
+  }
+  return <div className="mt-0.5 flex gap-0.5">{btn("up", ThumbsUp)}{btn("down", ThumbsDown)}</div>;
+};
+
+const Bubble = ({ m, onRate }) => (
+  <div className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
     <p data-testid={`chat-msg-${m.role}`} className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${m.role === "user" ? "rounded-br-sm bg-purple-600 text-white" : "rounded-bl-sm border border-purple-500/20 bg-white/[0.04] text-slate-200"}`}>
       {m.content || <Loader2 className="h-4 w-4 animate-spin text-purple-300" />}
     </p>
+    {m.role === "assistant" && m.id && <Rating m={m} onRate={onRate} />}
   </div>
 );
 
@@ -76,16 +99,26 @@ const ChatPanel = ({ onClose, supportPath }) => {
     setText("");
     setBusy(true);
     setMsgs((m) => [...m, { role: "user", content: message }, { role: "assistant", content: "" }]);
-    const patch = (fn) => setMsgs((m) => (m.length ? [...m.slice(0, -1), { role: "assistant", content: fn(m[m.length - 1].content) }] : m));
+    const patch = (fn, extra = {}) => setMsgs((m) => (m.length ? [...m.slice(0, -1), { ...m[m.length - 1], role: "assistant", content: fn(m[m.length - 1].content), ...extra }] : m));
     try {
-      await streamReply({ session_id: session, message }, (d, ticket) => {
-        patch((c) => c + d);
+      await streamReply({ session_id: session, message }, ({ delta, ticket, message_id }) => {
+        if (delta) patch((c) => c + delta);
+        if (message_id) patch((c) => c, { id: message_id });
         if (ticket) toast.success(`Support ticket ${ticket.reference} opened`, { position: "top-center", action: { label: "View", onClick: () => navigate(supportPath) } });
       });
     } catch (e) {
       patch((c) => c || e.message);
     } finally {
       setBusy(false);
+    }
+  };
+  const rate = async (id, rating, reason) => {
+    setMsgs((m) => m.map((x) => (x.id === id ? { ...x, rating } : x)));
+    try {
+      await api.post(`/assistant/messages/${id}/rate`, { rating, reason: reason || null });
+      if (rating === "down") toast.success("Thanks — this helps us improve Scara", { position: "top-center" });
+    } catch {
+      toast.error("Couldn't save your rating", { position: "top-center" });
     }
   };
   const newChat = () => {
@@ -118,7 +151,7 @@ const ChatPanel = ({ onClose, supportPath }) => {
             </div>
           </div>
         )}
-        {msgs.map((m, i) => <Bubble key={i} m={m} />)}
+        {msgs.map((m, i) => <Bubble key={m.id || i} m={m} onRate={rate} />)}
         <div ref={end} />
       </div>
       <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2 border-t border-purple-500/15 p-3">

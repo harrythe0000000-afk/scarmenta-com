@@ -92,6 +92,7 @@ class RegisterIn(BaseModel):
     agent_code: Optional[str] = Field(default=None, max_length=20)
     accepted_terms: bool = False
     terms_version: Optional[str] = Field(default=None, max_length=20)
+    signup_source: Optional[Literal["calc_share"]] = None
 
 
 class LoginIn(BaseModel):
@@ -180,6 +181,7 @@ class SettingsIn(BaseModel):
     loss_reward_percent: float = Field(ge=0, le=100)
     deposit_alerts: bool
     transfer_fee_percent: float = Field(ge=0, le=50)
+    share_bonus_amount: float = Field(default=5.0, ge=0, le=1000)
     packages: List[float] = Field(min_length=1, max_length=8)
     fx_rates: Dict[str, float]
     upi_id: str = Field(max_length=100)
@@ -257,6 +259,7 @@ async def register(body: RegisterIn, request: Request, response: Response):
             "email_verified": False, "promo_balance": 0.0, "referral_code": await unique_referral_code(),
             "referred_by": referrer["id"] if referrer else None,
             "referred_by_email": referrer["email"] if referrer else None,
+            "signup_source": body.signup_source if referrer else None,
             "agent_id": agent["id"] if agent else None, "created_at": now_iso(),
             "terms_accepted_at": now_iso(), "terms_version": body.terms_version}
     await db.users.insert_one(user)
@@ -446,7 +449,8 @@ async def reset_password(body: ResetIn):
 async def public_config():
     s = await get_settings()
     out = {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages", "fx_rates",
-                             "referral_bonus_percent", "loss_reward_percent", "transfer_fee_percent")}
+                             "referral_bonus_percent", "loss_reward_percent", "transfer_fee_percent",
+                             "share_bonus_amount")}
     out["currency"] = "USD"
     out["payment"] = {"upi_id": s["upi_id"], "usdt": {n: s[k] for n, k in NETWORKS.items()}}
     return out
@@ -721,6 +725,7 @@ async def admin_approve(dep_id: str, admin: dict = Depends(require_staff)):
         raise HTTPException(status_code=409, detail="Deposit not found or already reviewed")
     await credit_deposit(dep)
     await referrals.reward_referrer(dep)
+    await referrals.reward_share(dep)
     await agents.reward_agent(dep)
     return dep
 

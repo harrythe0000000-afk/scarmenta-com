@@ -7,11 +7,13 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 
 from agents import TIER_TEXT, _stats, tier_rate
-from core import db, get_current_user, require_staff, get_settings, new_id, new_ticket, now, now_iso
+from core import db, get_current_user, require_admin, require_staff, get_settings, new_id, new_ticket, now, now_iso
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -19,6 +21,7 @@ MODEL = ("openai", "gpt-6-luna")
 HISTORY_LIMIT = 30
 RATE_LIMIT = 20
 RATE_WINDOW_MIN = 10
+MAX_ANSWERS = 60
 SESSION_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 TICKET_RE = re.compile(r"\[\[\s*TICKET:\s*(.+?)\s*\|\s*(\w+)\s*\]\]", re.S)
 CATEGORIES = {"deposit", "wallet", "account", "technical", "other"}
@@ -72,6 +75,18 @@ TICKET_RULE = """If you cannot resolve the issue yourself (deposit not credited,
 Use the tag only when really needed, never for questions you answered."""
 
 
+async def official_answers() -> str:
+    docs = await db.bot_answers.find({"active": True, "deleted": {"$ne": True}}, {"_id": 0, "question": 1, "answer": 1}
+                                     ).sort("created_at", 1).to_list(MAX_ANSWERS)
+    if not docs:
+        return ""
+    items = "\n".join(f"Q: {d['question']}\nA: {d['answer']}" for d in docs)
+    return f"""OFFICIAL ANSWERS written by Scarmenta admin. When the user's question matches one of these (in any language or wording), reply with that answer: keep its meaning, facts, numbers and links exactly; only translate it into the user's language and adjust grammar. These override the general facts below.
+{items}
+
+"""
+
+
 async def system_prompt(user: dict) -> str:
     snapshot = await (agent_snapshot(user) if user["role"] == "agent" else account_snapshot(user))
     where = "agent portal" if user["role"] == "agent" else "player dashboard"
@@ -82,7 +97,7 @@ You cannot change balances, approve deposits or perform actions; explain which p
 
 {TICKET_RULE}
 
-{platform_facts(await get_settings())}
+{await official_answers()}{platform_facts(await get_settings())}
 
 {snapshot}"""
 
@@ -106,8 +121,72 @@ async def ticket_from_chat(user: dict, session_id: str, m: re.Match, past: list,
 @router.get("/assistant/history")
 async def history(session_id: str = Query(min_length=8, max_length=64), user: dict = Depends(get_current_user)):
     msgs = await db.chat_messages.find({"user_id": user["id"], "session_id": session_id},
-                                       {"_id": 0, "role": 1, "content": 1, "created_at": 1}).sort("created_at", 1).to_list(200)
+                                       {"_id": 0, "id": 1, "role": 1, "content": 1, "rating": 1, "created_at": 1}).sort("created_at", 1).to_list(200)
     return msgs
+
+
+class RateIn(BaseModel):
+    rating: Literal["up", "down"]
+    reason: Optional[str] = Field(default=None, max_length=300)
+
+
+@router.post("/assistant/messages/{mid}/rate")
+async def rate_message(mid: str, body: RateIn, user: dict = Depends(get_current_user)):
+    reason = (body.reason or "").strip() or None if body.rating == "down" else None
+    r = await db.chat_messages.update_one({"id": mid, "user_id": user["id"], "role": "assistant"},
+                                          {"$set": {"rating": body.rating, "rating_reason": reason, "rated_at": now_iso()}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
+
+
+class AnswerIn(BaseModel):
+    question: str = Field(min_length=3, max_length=200)
+    answer: str = Field(min_length=3, max_length=1500)
+    active: bool = True
+
+
+class AnswerPatch(BaseModel):
+    question: Optional[str] = Field(default=None, min_length=3, max_length=200)
+    answer: Optional[str] = Field(default=None, min_length=3, max_length=1500)
+    active: Optional[bool] = None
+
+
+ANSWER_FIELDS = {"_id": 0, "id": 1, "question": 1, "answer": 1, "active": 1, "created_at": 1, "updated_at": 1}
+
+
+@router.get("/admin/assistant/answers")
+async def list_answers(_: dict = Depends(require_staff)):
+    return await db.bot_answers.find({"deleted": {"$ne": True}}, ANSWER_FIELDS).sort("created_at", -1).to_list(MAX_ANSWERS)
+
+
+@router.post("/admin/assistant/answers")
+async def create_answer(body: AnswerIn, admin: dict = Depends(require_admin)):
+    if await db.bot_answers.count_documents({"deleted": {"$ne": True}}) >= MAX_ANSWERS:
+        raise HTTPException(status_code=400, detail=f"You can save up to {MAX_ANSWERS} answers")
+    doc = {"id": new_id(), "question": body.question.strip(), "answer": body.answer.strip(), "active": body.active,
+           "created_by": admin["email"], "created_at": now_iso(), "updated_at": now_iso(), "deleted": False}
+    await db.bot_answers.insert_one(dict(doc))
+    return {k: doc[k] for k in ANSWER_FIELDS if k != "_id"}
+
+
+@router.patch("/admin/assistant/answers/{aid}")
+async def update_answer(aid: str, body: AnswerPatch, _: dict = Depends(require_admin)):
+    data = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.model_dump(exclude_none=True).items()}
+    if not data:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    r = await db.bot_answers.update_one({"id": aid, "deleted": {"$ne": True}}, {"$set": {**data, "updated_at": now_iso()}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    return {"ok": True}
+
+
+@router.delete("/admin/assistant/answers/{aid}")
+async def delete_answer(aid: str, _: dict = Depends(require_admin)):
+    r = await db.bot_answers.update_one({"id": aid}, {"$set": {"deleted": True, "active": False}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Answer not found")
+    return {"ok": True}
 
 
 @router.post("/assistant/chat")
@@ -159,8 +238,10 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
             yield f"data: {json.dumps({'delta': note, 'ticket': {'reference': ticket['reference']}})}\n\n"
         await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
                                            "role": "user", "content": text, "created_at": asked_at})
-        await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
-                                           "role": "assistant", "content": reply, "created_at": now_iso()})
+        mid = new_id()
+        await db.chat_messages.insert_one({"id": mid, "user_id": user["id"], "session_id": body.session_id,
+                                           "role": "assistant", "content": reply, "question": text, "created_at": now_iso()})
+        yield f"data: {json.dumps({'message_id': mid})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream",
@@ -189,7 +270,16 @@ async def insights(days: int = Query(default=30, ge=1, le=365), _: dict = Depend
         words.update({w for w in norm.split() if len(w) > 2 and w not in STOP and not any(ch.isdigit() for ch in w)})
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": list({q["user_id"] for q in qs})}},
                                                      {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(5000)}
+    rated = await db.chat_messages.find({"role": "assistant", "rating": {"$in": ["up", "down"]}, "rated_at": {"$gt": since}},
+                                        {"_id": 0, "user_id": 1, "rating": 1, "rating_reason": 1, "question": 1,
+                                         "content": 1, "rated_at": 1}).sort("rated_at", -1).to_list(2000)
+    downs = [r for r in rated if r["rating"] == "down"]
+    users.update({u["id"]: u for u in await db.users.find({"id": {"$in": list({r["user_id"] for r in downs[:30]} - set(users))}},
+                                                          {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(100)})
     return {
+        "ratings": {"up": len(rated) - len(downs), "down": len(downs)},
+        "disliked": [{"question": r.get("question") or "—", "answer": r["content"], "reason": r.get("rating_reason"),
+                      "name": users.get(r["user_id"], {}).get("name", "—"), "rated_at": r["rated_at"]} for r in downs[:30]],
         "days": days, "questions": len(qs), "people": len({q["user_id"] for q in qs}),
         "chats": len({q["session_id"] for q in qs}),
         "tickets": await db.tickets.count_documents({"source": "assistant", "created_at": {"$gt": since}}),

@@ -18,7 +18,7 @@ export const ShareResult = ({ amount, rate, days, res }) => {
   const { user } = useAuth();
   const [busy, setBusy] = useState("");
   const code = user?.referral_code;
-  const link = `${window.location.origin}/register${code ? `?ref=${code}` : ""}`;
+  const link = `${window.location.origin}/register${code ? `?ref=${code}&src=calc` : ""}`;
   const text = `I tried the Scarmenta compound calculator. Join with my code ${code || ""}: ${link}`;
   const make = () => renderShareImage({ amount, rate, days, final: res.final, chart: res.chart, code, link });
 

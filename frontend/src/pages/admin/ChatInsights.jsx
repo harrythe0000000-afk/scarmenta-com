@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, LifeBuoy, MessagesSquare, Users } from "lucide-react";
+import { HelpCircle, LifeBuoy, MessagesSquare, ThumbsDown, ThumbsUp, Users } from "lucide-react";
 import { EmptyState, PageHeader, StatCard } from "@/components/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFetch } from "@/lib/hooks";
@@ -73,6 +73,30 @@ const Recent = ({ rows }) => (
   </div>
 );
 
+const Disliked = ({ ratings, rows }) => (
+  <div className="card-lux p-6" data-testid="insights-disliked">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <p className="label-eyebrow">Answers players didn't like</p>
+      <div className="flex gap-4 text-sm">
+        <span className="flex items-center gap-1 text-emerald-300" data-testid="insights-rating-up"><ThumbsUp className="h-4 w-4" /> {ratings.up}</span>
+        <span className="flex items-center gap-1 text-red-300" data-testid="insights-rating-down"><ThumbsDown className="h-4 w-4" /> {ratings.down}</span>
+      </div>
+    </div>
+    {rows.length === 0 ? <p className="text-sm text-slate-500">No thumbs-down yet.</p> : (
+      <div className="space-y-3">
+        {rows.map((r, i) => (
+          <div key={i} className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-4 text-sm" data-testid={`insights-disliked-row-${i}`}>
+            <p className="text-white"><span className="text-slate-500">Q:</span> {r.question}</p>
+            <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-slate-400"><span className="text-slate-500">Bot:</span> {r.answer}</p>
+            <p className="mt-2 text-xs text-slate-500">{r.reason ? <span className="text-amber-200">“{r.reason}”</span> : "No reason given"} · {r.name} · {fmtDate(r.rated_at)}</p>
+          </div>
+        ))}
+      </div>
+    )}
+    <p className="mt-4 text-xs text-slate-500">Tip: add a fixed reply in Bot Answers for questions that keep getting thumbs-down.</p>
+  </div>
+);
+
 export default function ChatInsights() {
   const [days, setDays] = useState(30);
   const { data } = useFetch(`/admin/assistant/insights?days=${days}`);
@@ -91,6 +115,7 @@ export default function ChatInsights() {
             <TopWords words={data.top_words} />
             <Repeated items={data.top_questions} />
           </div>
+          <Disliked ratings={data.ratings} rows={data.disliked} />
           <Recent rows={data.recent} />
         </div>
       )}

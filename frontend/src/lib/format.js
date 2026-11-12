@@ -30,6 +30,7 @@ export const TX_TYPES = {
   win: "Win",
   rollback: "Bet Refund",
   referral_bonus: "Referral Income",
+  share_bonus: "Share Bonus",
   loss_reward: "Loss Reward",
   transfer_out: "Transfer Out",
   transfer_in: "Transfer In",
