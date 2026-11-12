@@ -9,8 +9,8 @@ import { PageHeader } from "@/components/StatCard";
 const UNITS = [["days", "Days", 1], ["weeks", "Weeks", 7], ["months", "Months", 30], ["years", "Years", 365]];
 const PRESETS = [[10, "days"], [20, "days"], [30, "days"], [6, "months"], [1, "years"], [500, "days"]];
 const MAX_DAYS = 3650;
-const money = (n) => (n >= 1e12 ? `$${n.toExponential(2)}` : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }));
-const compact = (n) => (n >= 1e12 ? n.toExponential(1) : Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n));
+const money = (n) => (!Number.isFinite(n) ? "Too large" : n >= 1e12 ? `$${n.toExponential(2)}` : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }));
+const compact = (n) => (!Number.isFinite(n) ? "∞" : n >= 1e12 ? n.toExponential(1) : Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n));
 
 const compute = (amount, rate, days) => {
   const r = rate / 100;
@@ -133,6 +133,8 @@ export default function CompoundCalculator() {
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <Inputs f={f} setF={setF} />
         <div className="space-y-6">
+          {rawDays < 1 && <p className="text-xs text-amber-300" data-testid="calc-min-note">Enter a period of at least 1 day — showing 1 day for now.</p>}
+          {!Number.isFinite(res.final) && <p className="text-xs text-amber-300" data-testid="calc-overflow-note">This result is too large to calculate. Try a lower return or a shorter period.</p>}
           {rawDays > MAX_DAYS && <p className="text-xs text-amber-300" data-testid="calc-cap-note">Capped at {MAX_DAYS.toLocaleString()} days (10 years).</p>}
           <Results amount={amount} days={days} res={res} />
           <GrowthChart data={res.chart} />

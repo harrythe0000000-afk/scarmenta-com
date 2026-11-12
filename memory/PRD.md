@@ -66,3 +66,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Players/agents see active popups once per login (sessionStorage scarmenta_popups_seen cleared on login/logout)
 - Admin "Ask all users to re-accept" sets settings.terms.reaccept_at; users with older terms_accepted_at get blocking scroll-to-accept dialog; stats accepted/pending
 - Tests: backend/tests/test_popups_terms.py, test_reports/iteration_11.json (pass)
+
+## 2026-11-12 Compound calculator + AI help chat
+- /app/calculator: amount, daily %, period in days/weeks(7)/months(30)/years(365), presets, final/profit/growth, recharts area chart, milestone table, disclaimer, 3650-day cap, overflow handling
+- AI chat "Scara" (backend/assistant.py, GPT 6 Luna gpt-6-luna via EMERGENT_LLM_KEY): floating widget for players only; SSE streaming; multi-turn sessions persisted in chat_messages (session id in localStorage, New chat button); knows platform facts + user account snapshot; 20 msgs / 10 min rate limit
+- Popup stats (unique views/clicks) + IST scheduling added earlier today
+- Tests: iteration_12.json, iteration_13.json pass

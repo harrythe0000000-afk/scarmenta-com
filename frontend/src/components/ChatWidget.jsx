@@ -23,6 +23,7 @@ async function streamReply(body, onDelta) {
     await api.post("/auth/refresh").catch(() => {});
     res = await postChat(body);
   }
+  if (res.status === 429) throw new Error((await res.json()).detail);
   if (!res.ok || !res.body) throw new Error("Couldn't reach the assistant. Please try again.");
   const reader = res.body.getReader();
   const dec = new TextDecoder();

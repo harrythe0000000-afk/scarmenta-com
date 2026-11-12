@@ -2,18 +2,21 @@ import json
 import logging
 import os
 import re
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 
-from core import db, get_current_user, get_settings, new_id, now_iso
+from core import db, get_current_user, get_settings, new_id, now, now_iso
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
 MODEL = ("openai", "gpt-6-luna")
 HISTORY_LIMIT = 30
+RATE_LIMIT = 20
+RATE_WINDOW_MIN = 10
 SESSION_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 
 
@@ -82,9 +85,11 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
     llm = LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=body.session_id, system_message="",
                   initial_messages=[{"role": "system", "content": await system_prompt(user)}, *reversed(past)]
                   ).with_model(*MODEL)
+    since = (now() - timedelta(minutes=RATE_WINDOW_MIN)).isoformat()
+    if await db.chat_messages.count_documents({"user_id": user["id"], "role": "user", "created_at": {"$gt": since}}) >= RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="You're sending messages too fast. Please wait a few minutes.")
     text = body.message.strip()
-    await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
-                                       "role": "user", "content": text, "created_at": now_iso()})
+    asked_at = now_iso()
 
     async def events():
         reply = ""
@@ -99,6 +104,8 @@ async def chat(body: ChatIn, user: dict = Depends(get_current_user)):
             logger.error(f"assistant stream failed: {e}")
             yield f"data: {json.dumps({'error': 'The assistant is busy right now. Please try again in a moment.'})}\n\n"
         if reply:
+            await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
+                                               "role": "user", "content": text, "created_at": asked_at})
             await db.chat_messages.insert_one({"id": new_id(), "user_id": user["id"], "session_id": body.session_id,
                                                "role": "assistant", "content": reply, "created_at": now_iso()})
         yield "data: [DONE]\n\n"

@@ -89,7 +89,7 @@ export default function DashboardShell({ nav: allNav, area }) {
       </header>
 
       <main className="lg:pl-64">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 lg:py-12">
+        <div className={`mx-auto max-w-7xl px-4 py-8 sm:px-8 lg:py-12 ${user?.role === "user" ? "pb-28 lg:pb-28" : ""}`}>
           {user?.role === "user" && !user.email_verified && <VerifyBanner />}
           {termsRequired && <TermsReaccept onDone={() => setTermsRequired(false)} />}
           {termsRequired === false && (user?.role === "user" || user?.role === "agent") && <UserPopups />}

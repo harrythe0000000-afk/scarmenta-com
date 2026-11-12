@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the compound calculator and the AI help chat (Scara, gpt-6-luna), backend and UI. Backend: 12/12 new pytest tests pass in test_assistant_chat.py. They cover SSE streaming with data:{delta} and [DONE], 401 when logged out, 403 for admin/staff/agent, 422 for an empty message, 400 for a bad session id, the bot knowing the balance ($1,039.00), the no-withdrawal answer, multi-turn memory, history persisted in order without _id, and another player getting [] for the demo player's session. UI (desktop and mobile): the calculator defaults show $14,477.28 / $14,377.28 / 144.8x with the disclaimer. 1 year = $3,778.34, 2 weeks = $114.95 (row 14), 6 months = $599.58 (row 180). All 6 presets work, the cap note shows for 20 years, the chart renders, and the last table row (500) matches the final amount. Empty or zero inputs do not crash. Chat: the launcher shows on /app, /app/calculator, /app/deposits and /app/account, and not for admin, staff or agent. Suggestions work and replies stream in (the deposit steps answer was correct). The follow-up 'minimum amount for that?' got the answer $10. History reloads after close/reopen and after a page reload. '+' starts an empty session. The Hinglish question about the referral code got AE843071. Regression: a TEST_ user popup still shows alongside the widget, and the launcher is correctly blocked while the modal is open. Total LLM calls: 6.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/assistant/chat", "issue": "No per-user rate limit or quota, so a player can spam LLM calls and run up Emergent key cost."},
+      {"endpoint": "POST /api/assistant/chat", "issue": "The user message is saved before the LLM call. If the LLM fails or the client disconnects mid-stream, no assistant reply is saved, which leaves orphan user turns (two user messages in a row in history)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Calculator", "issue": "Extreme inputs overflow: rate 100% for 3650 days shows '$Infinity', 'Infinityx' and '+$NaN' table rows. Clamp the output or show a 'too large' message when the result is not finite.", "selector": "[data-testid='calc-final']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile player pages", "issues": ["The fixed chat launcher (bottom-right, 56px) covers the bottom-right content when scrolling, such as the last column of the calculator table. Consider adding bottom padding to main on mobile."]},
+      {"screen": "Calculator", "issues": ["An empty or 0 period silently becomes 1 day ($101.00) with no hint. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_assistant_chat.py", "/app/backend/tests/manual_popup_helper.py", "/app/test_reports/pytest/assistant_results.xml"],
+  "action_items": [
+    "(Low) Guard non-finite results in Calculator.jsx: if the result is not finite, show a cap or 'too large' text instead of $Infinity/NaN",
+    "(Low) Add a simple per-user rate limit on /api/assistant/chat",
+    "(Optional) Add bottom padding on mobile so the chat launcher does not cover content"
+  ],
+  "critical_code_review_comments": [
+    "assistant.py: the reply is only saved when the generator finishes. A client abort cancels the generator, so a partial reply is lost while the user message stays saved.",
+    "ChatWidget.jsx: JSON.parse on SSE lines has no try/catch. A malformed chunk would throw and show the generic error. Acceptable.",
+    "ChatWidget.jsx: the localStorage session key is not scoped per user. A second player on the same browser reuses the session id, but history is filtered by user_id, so there is no data leak.",
+    "GET /api/assistant/history does not enforce role=user. Non-players just get []. Harmless."
+  ],
+  "updated_files": ["/app/backend/tests/test_assistant_chat.py", "/app/backend/tests/manual_popup_helper.py"],
+  "success_rate": {"backend": "100%", "frontend": "97% (only the extreme-input overflow)"},
+  "seed_data_creation": "Created the TEST_ChatRegressionPopup banner and then deleted it by id. Deleted my own chat_messages sessions by id: the test-37e3..., 99271c9b... and 299533ae... sessions. Main agent's sessions (test-session-001, b83dbd86...) were left untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with the default pytest.ini (xdist loadscope). TestChatFlow must stay in one class because it is sequential. test_assistant_chat.py makes 3 LLM calls (~5 s total). The demo balance is $1,039, the referral code is AE843071 and the min deposit is $10. Terms re-accept was not triggered this time because require-reaccept is global and affects every user. It was verified in iteration 12."
+}
