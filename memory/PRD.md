@@ -94,3 +94,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Player Leaderboard tabs: Top losses / Top sharers (friends signed up via calc share link, rolling 7 days, masked)
 - Admin /admin/top-sharers (admin only): full table, reward top 3 (default 25/15/10) -> promo_balance + tx sharer_reward; 7-day cooldown; db.locks guard against double pay
 - Tests: iteration_16.json pass
+
+## 2026-11-12 Demo card game + BULKAPI status
+- /app/demo-game: frontend-only practice table "Scarmenta vs Rivals" (Stake/1win/4rabet text badges), higher card wins, same rank = Tie (8:1, side bets half back), fair crypto random, demo $1,000 balance reset on page open + Reset button; no backend, no real balance
+- BULKAPI: paused by user. Report at memory/BULKAPI_REPORT.md. Secrets BULKAPI_API_TOKEN/SECRET_KEY/UNIQUE_CODE saved; no docs + shared callback with Lara.in blocks integration

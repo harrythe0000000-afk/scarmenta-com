@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2 } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2, Spade } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -38,6 +38,7 @@ import AdminTopSharers from "@/pages/admin/TopSharers";
 import UserTransfer from "@/pages/user/Transfer";
 import UserCalculator from "@/pages/user/Calculator";
 import UserLeaderboard from "@/pages/user/Leaderboard";
+import UserDemoGame from "@/pages/user/DemoGame";
 import AgentDashboard from "@/pages/agent/Dashboard";
 
 const USER_NAV = [
@@ -45,6 +46,7 @@ const USER_NAV = [
   { id: "user-deposits", to: "/app/deposits", label: "Deposits", icon: ArrowDownToLine },
   { id: "user-transfer", to: "/app/transfer", label: "Transfer", icon: ArrowLeftRight },
   { id: "user-games", to: "/app/games", label: "Games", icon: Gamepad2 },
+  { id: "user-demo-game", to: "/app/demo-game", label: "Demo Game", icon: Spade },
   { id: "user-leaderboard", to: "/app/leaderboard", label: "Leaderboard", icon: Trophy },
   { id: "user-calculator", to: "/app/calculator", label: "Calculator", icon: Calculator },
   { id: "user-refer", to: "/app/refer", label: "Refer & Earn", icon: Gift },
@@ -103,6 +105,7 @@ function App() {
             <Route path="games" element={<UserGames />} />
             <Route path="calculator" element={<UserCalculator />} />
             <Route path="leaderboard" element={<UserLeaderboard />} />
+            <Route path="demo-game" element={<UserDemoGame />} />
             <Route path="refer" element={<UserRefer />} />
             <Route path="rewards" element={<UserRewards />} />
             <Route path="statement" element={<UserStatement />} />
