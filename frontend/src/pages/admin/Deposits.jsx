@@ -11,6 +11,7 @@ import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
+import { useAuth } from "@/context/AuthContext";
 import { fmtDate, usd, methodLabel, localMoney } from "@/lib/format";
 
 const Risk = ({ score, flags }) => {
@@ -24,6 +25,7 @@ const Risk = ({ score, flags }) => {
 };
 
 export default function AdminDeposits() {
+  const { user: me } = useAuth();
   const [status, setStatus] = useState("pending");
   const { data, reload } = useFetch(`/admin/deposits?status=${status}`);
   const [rejecting, setRejecting] = useState(null);
@@ -57,9 +59,9 @@ export default function AdminDeposits() {
   return (
     <>
       <PageHeader eyebrow="Deposit monitoring" title="Approval queue" desc="Approving a deposit adds credits to the player's balance at the configured multiplier." />
-      <Link to="/admin/settings" data-testid="admin-payment-setup-link" className="mb-5 flex items-center justify-between rounded-xl border border-purple-500/25 bg-purple-500/5 px-4 py-3 text-sm text-purple-200 transition-colors hover:bg-purple-500/10">
+      {me?.role === "admin" && <Link to="/admin/settings" data-testid="admin-payment-setup-link" className="mb-5 flex items-center justify-between rounded-xl border border-purple-500/25 bg-purple-500/5 px-4 py-3 text-sm text-purple-200 transition-colors hover:bg-purple-500/10">
         <span>Add or change where players pay you (UPI ID, USDT addresses, $ to ₹ rate) in Credit Config</span><span>Open →</span>
-      </Link>
+      </Link>}
       <Tabs value={status} onValueChange={setStatus} className="mb-5">
         <TabsList className="bg-white/[0.03]">
           {["pending", "approved", "rejected", "all"].map((s) => <TabsTrigger key={s} value={s} data-testid={`admin-deposits-tab-${s}`} className="capitalize data-[state=active]:bg-purple-600 data-[state=active]:text-white">{s}</TabsTrigger>)}

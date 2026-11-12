@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pymongo import ReturnDocument
 
-from core import FRONTEND_URL, db, get_current_user, get_settings, make_tx, now_iso, require_admin, unique_referral_code
+from core import FRONTEND_URL, db, get_current_user, get_settings, make_tx, now_iso, require_staff, unique_referral_code
 
 router = APIRouter(prefix="/api")
 
@@ -56,7 +56,7 @@ async def reward_referrer(dep: dict) -> None:
 
 
 @router.get("/admin/referrals")
-async def admin_referrals(status: Optional[str] = None, _: dict = Depends(require_admin)):
+async def admin_referrals(status: Optional[str] = None, _: dict = Depends(require_staff)):
     q: dict = {"referred_by": {"$ne": None}}
     if status == "earning":
         q["referral_rewarded"] = True

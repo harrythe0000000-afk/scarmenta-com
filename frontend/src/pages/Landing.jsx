@@ -12,7 +12,7 @@ const HERO_IMG = "https://images.unsplash.com/photo-1689443111130-6e9c7dfd8f9e?c
 
 const NavBar = () => {
   const { user } = useAuth();
-  const dash = user ? (user.role === "admin" ? "/admin" : "/app") : null;
+  const dash = user ? (user.role === "user" ? "/app" : "/admin") : null;
   return (
     <header className="sticky top-0 z-40 border-b border-purple-500/10 glass">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">

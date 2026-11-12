@@ -127,6 +127,12 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+async def require_staff(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Staff access required")
+    return user
+
+
 async def get_settings() -> dict:
     doc = await db.settings.find_one({"key": "platform"}, {"_id": 0, "key": 0}) or {}
     return {**DEFAULT_SETTINGS, **doc}

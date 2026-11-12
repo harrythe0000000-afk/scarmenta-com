@@ -33,8 +33,10 @@ const VerifyBanner = () => {
   );
 };
 
-export default function DashboardShell({ nav, area }) {
+export default function DashboardShell({ nav: allNav, area }) {
   const { user, logout } = useAuth();
+  const nav = allNav.filter((n) => !n.adminOnly || user?.role === "admin");
+  if (user?.role === "staff") area = "Staff Console";
   const navigate = useNavigate();
   const doLogout = async () => {
     await logout();

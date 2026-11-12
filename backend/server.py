@@ -1,5 +1,5 @@
 from core import (db, client, now, now_iso, new_id, clean, hash_password, verify_password, set_auth_cookies,
-                  set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin,
+                  set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin, require_staff,
                   get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, FRONTEND_URL, make_tx,
                   unique_referral_code)
 from emailer import send_verification_email, send_reset_email, send_otp_email
@@ -95,6 +95,12 @@ class AccountIn(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     email: Optional[EmailStr] = None
     new_password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
+class StaffIn(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
 
 
 class TokenIn(BaseModel):
@@ -535,7 +541,7 @@ async def reply_ticket(ticket_id: str, body: ReplyIn, user: dict = Depends(get_c
 
 # ---------- Admin ----------
 @api.get("/admin/stats")
-async def admin_stats(_: dict = Depends(require_admin)):
+async def admin_stats(_: dict = Depends(require_staff)):
     agg = await db.deposits.aggregate([
         {"$match": {"status": "approved"}},
         {"$group": {"_id": None, "deposits": {"$sum": "$amount"}, "credits": {"$sum": "$promo_credit"},
@@ -566,7 +572,7 @@ async def admin_stats(_: dict = Depends(require_admin)):
 
 
 @api.get("/admin/users")
-async def admin_users(q: Optional[str] = None, _: dict = Depends(require_admin)):
+async def admin_users(q: Optional[str] = None, _: dict = Depends(require_staff)):
     query: dict = {}
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
@@ -603,13 +609,13 @@ async def admin_adjust(user_id: str, body: AdjustIn, admin: dict = Depends(requi
 
 
 @api.get("/admin/deposits")
-async def admin_deposits(status: Optional[str] = None, _: dict = Depends(require_admin)):
+async def admin_deposits(status: Optional[str] = None, _: dict = Depends(require_staff)):
     q = {"status": status} if status and status != "all" else {}
     return await db.deposits.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
 
 @api.post("/admin/deposits/{dep_id}/approve")
-async def admin_approve(dep_id: str, admin: dict = Depends(require_admin)):
+async def admin_approve(dep_id: str, admin: dict = Depends(require_staff)):
     dep = await db.deposits.find_one_and_update(
         {"id": dep_id, "status": "pending"},
         {"$set": {"status": "approved", "reviewed_at": now_iso(), "reviewed_by": admin["email"]}},
@@ -622,7 +628,7 @@ async def admin_approve(dep_id: str, admin: dict = Depends(require_admin)):
 
 
 @api.post("/admin/deposits/{dep_id}/reject")
-async def admin_reject(dep_id: str, body: RejectIn, admin: dict = Depends(require_admin)):
+async def admin_reject(dep_id: str, body: RejectIn, admin: dict = Depends(require_staff)):
     dep = await db.deposits.find_one_and_update(
         {"id": dep_id, "status": "pending"},
         {"$set": {"status": "rejected", "reviewed_at": now_iso(), "reviewed_by": admin["email"],
@@ -637,12 +643,39 @@ async def admin_reject(dep_id: str, body: RejectIn, admin: dict = Depends(requir
 
 @api.get("/admin/transactions")
 async def admin_transactions(q: Optional[str] = None, type: Optional[str] = None, wallet: Optional[str] = None,
-                             start: Optional[str] = None, end: Optional[str] = None, _: dict = Depends(require_admin)):
+                             start: Optional[str] = None, end: Optional[str] = None, _: dict = Depends(require_staff)):
     query = tx_query({}, type, wallet, start, end)
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
         query["$or"] = [{"user_email": rx}, {"reference": rx}, {"description": rx}]
     return await db.transactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+@api.get("/admin/staff")
+async def list_staff(_: dict = Depends(require_admin)):
+    return await db.users.find({"role": {"$in": ["admin", "staff"]}}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(200)
+
+
+@api.post("/admin/staff")
+async def create_staff(body: StaffIn, admin: dict = Depends(require_admin)):
+    if not body.name.strip():
+        raise HTTPException(status_code=422, detail="Name cannot be blank")
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    staff = {"id": new_id(), "email": email, "name": body.name.strip(), "password_hash": hash_password(body.password),
+             "role": "staff", "status": "active", "email_verified": True, "promo_balance": 0.0,
+             "created_by": admin["email"], "created_at": now_iso()}
+    await db.users.insert_one(staff)
+    return clean(staff)
+
+
+@api.patch("/admin/staff/{staff_id}/status")
+async def staff_status(staff_id: str, body: UserStatusIn, _: dict = Depends(require_admin)):
+    res = await db.users.update_one({"id": staff_id, "role": "staff"}, {"$set": {"status": body.status}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+    return {"ok": True}
 
 
 @api.get("/admin/settings")
@@ -672,13 +705,13 @@ async def admin_put_settings(body: SettingsIn, admin: dict = Depends(require_adm
 
 
 @api.get("/admin/fraud")
-async def admin_fraud(status: Optional[str] = None, _: dict = Depends(require_admin)):
+async def admin_fraud(status: Optional[str] = None, _: dict = Depends(require_staff)):
     q = {"status": status} if status and status != "all" else {}
     return await db.fraud_alerts.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @api.post("/admin/fraud/{alert_id}/resolve")
-async def admin_resolve_alert(alert_id: str, admin: dict = Depends(require_admin)):
+async def admin_resolve_alert(alert_id: str, admin: dict = Depends(require_staff)):
     res = await db.fraud_alerts.update_one({"id": alert_id}, {"$set": {"status": "resolved", "resolved_by": admin["email"],
                                                                        "resolved_at": now_iso()}})
     if not res.matched_count:
@@ -687,17 +720,17 @@ async def admin_resolve_alert(alert_id: str, admin: dict = Depends(require_admin
 
 
 @api.get("/admin/tickets")
-async def admin_tickets(_: dict = Depends(require_admin)):
+async def admin_tickets(_: dict = Depends(require_staff)):
     return await db.tickets.find({}, {"_id": 0}).sort("updated_at", -1).to_list(500)
 
 
 @api.post("/admin/tickets/{ticket_id}/reply")
-async def admin_reply(ticket_id: str, body: ReplyIn, admin: dict = Depends(require_admin)):
+async def admin_reply(ticket_id: str, body: ReplyIn, admin: dict = Depends(require_staff)):
     return await append_reply(ticket_id, admin, body.message, {})
 
 
 @api.patch("/admin/tickets/{ticket_id}/status")
-async def admin_ticket_status(ticket_id: str, body: TicketStatusIn, _: dict = Depends(require_admin)):
+async def admin_ticket_status(ticket_id: str, body: TicketStatusIn, _: dict = Depends(require_staff)):
     t = await db.tickets.find_one_and_update({"id": ticket_id}, {"$set": {"status": body.status, "updated_at": now_iso()}},
                                              projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not t:

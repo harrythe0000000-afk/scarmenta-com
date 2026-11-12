@@ -99,7 +99,7 @@ const OtpLogin = () => {
     try {
       const { data } = await api.post("/auth/otp/verify", { email, code });
       setUser(data);
-      navigate(data.role === "admin" ? "/admin" : "/app");
+      navigate(data.role === "user" ? "/app" : "/admin");
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -139,7 +139,7 @@ const PasswordLogin = () => {
     setError("");
     try {
       const u = await login(form.email, form.password);
-      navigate(u.role === "admin" ? "/admin" : "/app");
+      navigate(u.role === "user" ? "/app" : "/admin");
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -288,7 +288,7 @@ export const VerifyEmail = () => {
         {state === "error" && (<><XCircle className="mx-auto h-10 w-10 text-red-400" /><p className="mt-3 text-red-200">{error}</p></>)}
         {state !== "loading" && (
           <Button asChild className="mt-6 rounded-full bg-purple-600 hover:bg-purple-500" data-testid="verify-continue-button">
-            <Link to={user ? (user.role === "admin" ? "/admin" : "/app") : "/login"}>Continue</Link>
+            <Link to={user ? (user.role === "user" ? "/app" : "/admin") : "/login"}>Continue</Link>
           </Button>
         )}
       </div>

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from core import db, get_current_user, get_settings, make_tx, new_id, now, now_iso, require_admin
+from core import db, get_current_user, get_settings, make_tx, new_id, now, now_iso, require_admin, require_staff
 
 router = APIRouter(prefix="/api")
 
@@ -136,7 +136,7 @@ async def _sum(coll, match: dict, field: str) -> float:
 
 
 @router.get("/admin/money-flow")
-async def money_flow(_: dict = Depends(require_admin)):
+async def money_flow(_: dict = Depends(require_staff)):
     approved = {"status": "approved"}
     bets = await _sum("game_transactions", {"status": "ok", "type": "bet"}, "amount")
     wins = await _sum("game_transactions", {"status": "ok", "type": "win"}, "amount")

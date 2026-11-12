@@ -9,6 +9,7 @@ import { EmptyState, PageHeader } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
+import { useAuth } from "@/context/AuthContext";
 import { fmtDate, usd } from "@/lib/format";
 
 const AdjustDialog = ({ user, onClose, onDone }) => {
@@ -41,6 +42,7 @@ const AdjustDialog = ({ user, onClose, onDone }) => {
 };
 
 export default function AdminUsers() {
+  const { user: me } = useAuth();
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const { data, reload } = useFetch(`/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`);
@@ -86,7 +88,7 @@ export default function AdminUsers() {
                   <TableCell className="whitespace-nowrap font-num text-xs text-slate-400">{fmtDate(u.created_at)}</TableCell>
                   <TableCell><StatusBadge status={u.status} testId={`admin-user-status-${u.email}`} /></TableCell>
                   <TableCell>
-                    {u.role === "user" && (
+                    {u.role === "user" && me?.role === "admin" && (
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => setAdjusting(u)} data-testid={`admin-adjust-btn-${u.email}`} className="rounded-full border-purple-500/30 bg-transparent hover:bg-purple-500/10"><SlidersHorizontal className="h-4 w-4" /></Button>
                         <Button size="sm" variant="outline" onClick={() => toggle(u)} data-testid={`admin-toggle-status-btn-${u.email}`}

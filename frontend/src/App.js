@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -27,6 +27,7 @@ import UserRewards from "@/pages/user/Rewards";
 import AdminLossRewards from "@/pages/admin/LossRewards";
 import AdminMoneyFlow from "@/pages/admin/MoneyFlow";
 import AccountSettings from "@/pages/AccountSettings";
+import AdminStaff from "@/pages/admin/Staff";
 
 const USER_NAV = [
   { id: "user-overview", to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
@@ -36,6 +37,7 @@ const USER_NAV = [
   { id: "user-rewards", to: "/app/rewards", label: "Loss Rewards", icon: Award },
   { id: "user-statement", to: "/app/statement", label: "Statement", icon: ScrollText },
   { id: "user-support", to: "/app/support", label: "Support", icon: LifeBuoy },
+  { id: "user-account", to: "/app/account", label: "My Account", icon: UserCog },
 ];
 
 const ADMIN_NAV = [
@@ -44,14 +46,15 @@ const ADMIN_NAV = [
   { id: "admin-deposits", to: "/admin/deposits", label: "Deposits", icon: ArrowDownToLine },
   { id: "admin-users", to: "/admin/users", label: "Users", icon: Users },
   { id: "admin-transactions", to: "/admin/transactions", label: "Transactions", icon: Receipt },
-  { id: "admin-providers", to: "/admin/providers", label: "Game Providers", icon: Plug },
+  { id: "admin-providers", to: "/admin/providers", label: "Game Providers", icon: Plug, adminOnly: true },
   { id: "admin-game-activity", to: "/admin/game-activity", label: "Game Activity", icon: Dices },
   { id: "admin-referrals", to: "/admin/referrals", label: "Referrals", icon: Gift },
-  { id: "admin-loss-rewards", to: "/admin/loss-rewards", label: "Loss Rewards", icon: Award },
+  { id: "admin-loss-rewards", to: "/admin/loss-rewards", label: "Loss Rewards", icon: Award, adminOnly: true },
   { id: "admin-fraud", to: "/admin/fraud", label: "Fraud Monitor", icon: ShieldAlert },
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
+  { id: "admin-staff", to: "/admin/staff", label: "Staff", icon: ShieldCheck, adminOnly: true },
   { id: "admin-account", to: "/admin/account", label: "My Account", icon: UserCog },
-  { id: "admin-settings", to: "/admin/settings", label: "Credit Config", icon: Settings2 },
+  { id: "admin-settings", to: "/admin/settings", label: "Credit Config", icon: Settings2, adminOnly: true },
 ];
 
 function App() {
@@ -73,21 +76,23 @@ function App() {
             <Route path="rewards" element={<UserRewards />} />
             <Route path="statement" element={<UserStatement />} />
             <Route path="support" element={<UserSupport />} />
+            <Route path="account" element={<AccountSettings />} />
+            <Route path="staff" element={<ProtectedRoute role="owner"><AdminStaff /></ProtectedRoute>} />
           </Route>
           <Route path="/admin" element={<ProtectedRoute role="admin"><DashboardShell nav={ADMIN_NAV} area="Admin Cockpit" /></ProtectedRoute>}>
             <Route index element={<AdminOverview />} />
             <Route path="deposits" element={<AdminDeposits />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="transactions" element={<AdminTransactions />} />
-            <Route path="providers" element={<AdminProviders />} />
+            <Route path="providers" element={<ProtectedRoute role="owner"><AdminProviders /></ProtectedRoute>} />
             <Route path="game-activity" element={<AdminGameActivity />} />
             <Route path="referrals" element={<AdminReferrals />} />
-            <Route path="loss-rewards" element={<AdminLossRewards />} />
+            <Route path="loss-rewards" element={<ProtectedRoute role="owner"><AdminLossRewards /></ProtectedRoute>} />
             <Route path="money-flow" element={<AdminMoneyFlow />} />
             <Route path="account" element={<AccountSettings />} />
             <Route path="fraud" element={<AdminFraud />} />
             <Route path="support" element={<AdminSupport />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route path="settings" element={<ProtectedRoute role="owner"><AdminSettings /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

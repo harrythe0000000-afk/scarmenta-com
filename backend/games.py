@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from core import db, get_current_user, make_tx, new_id, now, now_iso, require_admin
+from core import db, get_current_user, make_tx, new_id, now, now_iso, require_admin, require_staff
 
 router = APIRouter(prefix="/api")
 
@@ -104,7 +104,7 @@ async def rotate_key(pid: str, _: dict = Depends(require_admin)):
 
 @router.get("/admin/game-transactions")
 async def admin_game_txs(provider_id: Optional[str] = None, type: Optional[str] = None, q: Optional[str] = None,
-                         _: dict = Depends(require_admin)):
+                         _: dict = Depends(require_staff)):
     query: dict = {}
     if provider_id:
         query["provider_id"] = provider_id
@@ -118,7 +118,7 @@ async def admin_game_txs(provider_id: Optional[str] = None, type: Optional[str] 
 
 
 @router.get("/admin/game-stats")
-async def admin_game_stats(_: dict = Depends(require_admin)):
+async def admin_game_stats(_: dict = Depends(require_staff)):
     rows = await db.game_transactions.aggregate([
         {"$match": {"status": "ok"}},
         {"$group": {"_id": {"p": "$provider_id", "t": "$type"}, "sum": {"$sum": "$amount"}, "n": {"$sum": 1}}}]).to_list(1000)
