@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2, Spade } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2, Spade, Camera } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -39,6 +39,8 @@ import UserTransfer from "@/pages/user/Transfer";
 import UserCalculator from "@/pages/user/Calculator";
 import UserLeaderboard from "@/pages/user/Leaderboard";
 import UserDemoGame from "@/pages/user/DemoGame";
+import UserContest from "@/pages/user/Contest";
+import AdminContest from "@/pages/admin/Contest";
 import AgentDashboard from "@/pages/agent/Dashboard";
 
 const USER_NAV = [
@@ -47,6 +49,7 @@ const USER_NAV = [
   { id: "user-transfer", to: "/app/transfer", label: "Transfer", icon: ArrowLeftRight },
   { id: "user-games", to: "/app/games", label: "Games", icon: Gamepad2 },
   { id: "user-demo-game", to: "/app/demo-game", label: "Demo Game", icon: Spade },
+  { id: "user-contest", to: "/app/contest", label: "Promo Contest", icon: Camera },
   { id: "user-leaderboard", to: "/app/leaderboard", label: "Leaderboard", icon: Trophy },
   { id: "user-calculator", to: "/app/calculator", label: "Calculator", icon: Calculator },
   { id: "user-refer", to: "/app/refer", label: "Refer & Earn", icon: Gift },
@@ -76,6 +79,7 @@ const ADMIN_NAV = [
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
   { id: "admin-agents", to: "/admin/agents", label: "Agents", icon: Handshake },
   { id: "admin-chat-insights", to: "/admin/chat-insights", label: "Chat Insights", icon: MessagesSquare },
+  { id: "admin-contest", to: "/admin/contest", label: "Promo Contest", icon: Camera },
   { id: "admin-top-sharers", to: "/admin/top-sharers", label: "Top Sharers", icon: Share2, adminOnly: true },
   { id: "admin-bot-answers", to: "/admin/bot-answers", label: "Bot Answers", icon: BotMessageSquare },
   { id: "admin-popups", to: "/admin/popups", label: "Popups & Terms", icon: Megaphone, adminOnly: true },
@@ -106,6 +110,7 @@ function App() {
             <Route path="calculator" element={<UserCalculator />} />
             <Route path="leaderboard" element={<UserLeaderboard />} />
             <Route path="demo-game" element={<UserDemoGame />} />
+            <Route path="contest" element={<UserContest />} />
             <Route path="refer" element={<UserRefer />} />
             <Route path="rewards" element={<UserRewards />} />
             <Route path="statement" element={<UserStatement />} />
@@ -130,6 +135,7 @@ function App() {
             <Route path="agents" element={<AdminAgents />} />
             <Route path="chat-insights" element={<AdminChatInsights />} />
             <Route path="bot-answers" element={<AdminBotAnswers />} />
+            <Route path="contest" element={<AdminContest />} />
             <Route path="top-sharers" element={<ProtectedRoute role="owner"><AdminTopSharers /></ProtectedRoute>} />
             <Route path="popups" element={<ProtectedRoute role="owner"><AdminPopups /></ProtectedRoute>} />
           </Route>

@@ -32,6 +32,7 @@ export const TX_TYPES = {
   referral_bonus: "Referral Income",
   share_bonus: "Share Bonus",
   sharer_reward: "Top Sharer Reward",
+  contest_bonus: "Contest Prize",
   loss_reward: "Loss Reward",
   transfer_out: "Transfer Out",
   transfer_in: "Transfer In",

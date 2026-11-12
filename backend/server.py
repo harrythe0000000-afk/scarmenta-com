@@ -9,6 +9,7 @@ import rewards
 import agents
 import content
 import assistant
+import contest
 
 import asyncio
 import logging
@@ -881,6 +882,7 @@ app.include_router(rewards.router)
 app.include_router(agents.router)
 app.include_router(content.router)
 app.include_router(assistant.router)
+app.include_router(contest.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 
