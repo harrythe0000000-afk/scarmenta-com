@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 7: tested the Player Account page (/app/account) and the Staff Admin roles (owner /admin/staff, staff login and permissions, staff deposit review, backend 403s). New pytest file test_staff_roles.py plus the existing test_account_update.py: 61/61 pass. One critical frontend bug found and fixed: the 'staff' route sat under /app instead of /admin, so the owner's nav-admin-staff link (/admin/staff) hit the '*' catch-all and was sent to the landing page '/'. I moved the route into the /admin block. After the fix the owner Staff page works: the list shows Owner + Staff rows, create works, a duplicate email shows a toast, Disable leads to a 403 on login, Enable leads to 200. Staff login lands on /admin with 'Staff Console' shown, and Game Providers/Loss Rewards/Staff/Credit Config are hidden. Direct visits to /admin/settings, /admin/providers, /admin/staff and /admin/loss-rewards redirect to /admin. User adjust/suspend buttons and the payment-setup link are hidden for staff. Staff approved a deposit in the UI (reviewed_by=staff@aetheria.io), replied to and resolved a ticket, and resolved fraud alerts. Account page: rename updates the sidebar, a wrong password shows a toast, mismatched passwords show a toast, a password change makes the old password return 401 and the new one work (restored), and an email change sets email_verified=false and shows the verify banner (restored). Regression checks passed: the owner sees all 14 nav items, the OTP toggle works, and logout works.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/auth/account", "issue": "If a player changes their email and then changes it back to the original verified address, email_verified stays false. A verification email is also sent to every interim address. Expected, but may confuse players."},
+      {"endpoint": "PUT /api/auth/account", "issue": "A staff user who changes their email gets email_verified=false and a verification email (only role 'admin' is exempt). This is harmless because staff can't deposit, but it is inconsistent."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App.js routes", "issue": "FIXED: the 'staff' route was nested under /app (as /app/staff), so /admin/staff redirected the owner to '/' (landing page)", "selector": "[data-testid='nav-admin-staff']", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Staff page", "issues": ["The temporary password field is type=text, so it shows in plain text. This is probably intentional (so the owner can share it), but consider a show/hide toggle."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_staff_roles.py", "/app/backend/tests/test_account_update.py", "/app/test_reports/pytest/pytest_results_iter7.xml"],
+  "action_items": [
+    "Review my App.js fix: the staff route now sits inside the /admin route block",
+    "Optional: skip email_verified=false when a user changes their email back to the original verified one; exempt the staff role from email re-verification"
+  ],
+  "critical_code_review_comments": [
+    "App.js: /admin/staff route was in the wrong parent (fixed)",
+    "ProtectedRoute role='admin' allows any non-user role. That is correct for staff, but any future role would also get in; consider an explicit allow-list",
+    "update_account: the find_one duplicate-email check isn't atomic; on a race, the unique index raises DuplicateKeyError (500). Wrap it in try/except and return 400",
+    "Disabling staff reuses status 'suspended', and get_current_user blocks existing sessions right away (verified 403)"
+  ],
+  "updated_files": ["/app/frontend/src/App.js", "/app/backend/tests/test_staff_roles.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% after the route fix"},
+  "seed_data_creation": "Created and deleted test_staff_* users (deleted by email/id) and TEST_ tickets (deleted by id). Created 3 small $10 USDT TRC20 TEST_ deposits for demo: 2 approved by staff (demo credit balance +$100), 1 rejected. Resolved the velocity fraud alerts those deposits created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Credentials restored: demo@aetheria.io/Demo@12345 (name 'Demo Player', email_verified true), staff@aetheria.io/Staff@12345 (name 'Staff Tester', active), admin@aetheria.io/Admin@12345. Run pytest tests/test_staff_roles.py tests/test_account_update.py with REACT_APP_BACKEND_URL exported. Each run approves one $10 demo deposit.",
+  "rca of the issue": "/admin/staff redirected to '/': in App.js, <Route path='staff'> was placed inside the <Route path='/app'> children, so the router had no /admin/staff route and fell through to <Route path='*'> -> Navigate('/'). Fix: move it into the /admin children, wrapped in ProtectedRoute role='owner'."
+}

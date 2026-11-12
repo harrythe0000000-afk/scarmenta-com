@@ -343,7 +343,7 @@ async def update_account(body: AccountIn, response: Response, user: dict = Depen
         if await db.users.find_one({"email": new_email}):
             raise HTTPException(status_code=400, detail="An account with this email already exists")
         changes["email"] = new_email
-        if full["role"] != "admin":
+        if full["role"] == "user":
             changes["email_verified"] = False
     if body.new_password:
         changes["password_hash"] = hash_password(body.new_password)
@@ -352,7 +352,7 @@ async def update_account(body: AccountIn, response: Response, user: dict = Depen
     changes["updated_at"] = now_iso()
     updated = await db.users.find_one_and_update({"id": user["id"]}, {"$set": changes},
                                                  projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-    if "email" in changes and full["role"] != "admin":
+    if "email" in changes and full["role"] == "user":
         await send_verification(updated)
     set_auth_cookies(response, updated)
     return updated

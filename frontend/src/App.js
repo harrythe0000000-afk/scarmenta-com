@@ -77,7 +77,6 @@ function App() {
             <Route path="statement" element={<UserStatement />} />
             <Route path="support" element={<UserSupport />} />
             <Route path="account" element={<AccountSettings />} />
-            <Route path="staff" element={<ProtectedRoute role="owner"><AdminStaff /></ProtectedRoute>} />
           </Route>
           <Route path="/admin" element={<ProtectedRoute role="admin"><DashboardShell nav={ADMIN_NAV} area="Admin Cockpit" /></ProtectedRoute>}>
             <Route index element={<AdminOverview />} />
@@ -93,6 +92,7 @@ function App() {
             <Route path="fraud" element={<AdminFraud />} />
             <Route path="support" element={<AdminSupport />} />
             <Route path="settings" element={<ProtectedRoute role="owner"><AdminSettings /></ProtectedRoute>} />
+            <Route path="staff" element={<ProtectedRoute role="owner"><AdminStaff /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
