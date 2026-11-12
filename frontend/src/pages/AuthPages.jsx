@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
 import { homeFor, isTeam } from "@/lib/roles";
-import { TermsContent } from "@/components/TermsContent";
+import { TermsAccept } from "@/components/TermsContent";
+import { resetPopupSession } from "@/components/UserPopups";
 import { TERMS_VERSION } from "@/lib/terms";
 
 const AuthLayout = ({ title, subtitle, children, footer }) => (
@@ -54,33 +55,6 @@ const SubmitBtn = ({ busy, children, testId }) => (
     {children}
   </Button>
 );
-
-const TermsAccept = ({ scrolled, onScrolled, checked, onChange }) => {
-  const onScroll = (e) => {
-    const el = e.currentTarget;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 12) onScrolled();
-  };
-  return (
-    <div className="space-y-3" data-testid="register-terms-block">
-      <p className="text-xs uppercase tracking-wider text-slate-400">Terms & Conditions</p>
-      <div onScroll={onScroll} data-testid="register-terms-scrollbox"
-        className="h-56 overflow-y-auto rounded-xl border border-purple-500/20 bg-black/40 p-4">
-        <TermsContent />
-      </div>
-      <p className="text-xs text-slate-500" data-testid="register-terms-hint">
-        {scrolled ? "Thanks for reading. You can now accept the terms." : "Scroll to the end of the terms to enable acceptance."}
-        {" "}<Link to="/terms" target="_blank" className="text-purple-300 hover:text-purple-200" data-testid="register-terms-link">Open full page</Link>
-      </p>
-      <label className={`flex items-start gap-3 text-xs ${scrolled ? "text-slate-300" : "text-slate-600"}`}>
-        <input type="checkbox" disabled={!scrolled} checked={checked} onChange={(e) => onChange(e.target.checked)}
-          data-testid="register-terms-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500 disabled:cursor-not-allowed" />
-        <span>I have read and agree to the Scarmenta Terms & Conditions and the{" "}
-          <Link to="/privacy" target="_blank" className="text-purple-300 underline hover:text-purple-200" data-testid="register-privacy-link">Privacy Policy</Link>,
-          including the credit usage, non-withdrawal and refund policies, and understand no winnings or profits are guaranteed.</span>
-      </label>
-    </div>
-  );
-};
 
 const ErrorText = ({ error, testId }) => error ? <p data-testid={testId} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p> : null;
 
@@ -164,6 +138,7 @@ const OtpLogin = () => {
     setError("");
     try {
       const { data } = await api.post("/auth/otp/verify", { email, code });
+      resetPopupSession();
       setUser(data);
       navigate(homeFor(data.role));
     } catch (err) {

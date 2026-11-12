@@ -7,6 +7,7 @@ import games
 import referrals
 import rewards
 import agents
+import content
 
 import asyncio
 import logging
@@ -872,6 +873,7 @@ app.include_router(referrals.router)
 app.include_router(games.router)
 app.include_router(rewards.router)
 app.include_router(agents.router)
+app.include_router(content.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 
@@ -880,6 +882,10 @@ app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(
 async def startup():
     app.state.index_task = asyncio.create_task(ensure_indexes())
     await seed()
+    try:
+        await asyncio.to_thread(content.init_storage)
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Storage init failed: {e}")
 
 
 @app.on_event("shutdown")

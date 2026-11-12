@@ -27,3 +27,30 @@ export const TermsContent = () => (
     </div>
   </div>
 );
+
+export const TermsAccept = ({ scrolled, onScrolled, checked, onChange, prefix = "register" }) => {
+  const onScroll = (e) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 12) onScrolled();
+  };
+  return (
+    <div className="space-y-3" data-testid={`${prefix}-terms-block`}>
+      <p className="text-xs uppercase tracking-wider text-slate-400">Terms & Conditions</p>
+      <div onScroll={onScroll} data-testid={`${prefix}-terms-scrollbox`}
+        className="h-56 overflow-y-auto rounded-xl border border-purple-500/20 bg-black/40 p-4">
+        <TermsContent />
+      </div>
+      <p className="text-xs text-slate-500" data-testid={`${prefix}-terms-hint`}>
+        {scrolled ? "Thanks for reading. You can now accept the terms." : "Scroll to the end of the terms to enable acceptance."}
+        {" "}<Link to="/terms" target="_blank" className="text-purple-300 hover:text-purple-200" data-testid={`${prefix}-terms-link`}>Open full page</Link>
+      </p>
+      <label className={`flex items-start gap-3 text-xs ${scrolled ? "text-slate-300" : "text-slate-600"}`}>
+        <input type="checkbox" disabled={!scrolled} checked={checked} onChange={(e) => onChange(e.target.checked)}
+          data-testid={`${prefix}-terms-checkbox`} className="mt-0.5 h-4 w-4 accent-purple-500 disabled:cursor-not-allowed" />
+        <span>I have read and agree to the Scarmenta Terms & Conditions and the{" "}
+          <Link to="/privacy" target="_blank" className="text-purple-300 underline hover:text-purple-200" data-testid={`${prefix}-privacy-link`}>Privacy Policy</Link>,
+          including the credit usage, non-withdrawal and refund policies, and understand no winnings or profits are guaranteed.</span>
+      </label>
+    </div>
+  );
+};

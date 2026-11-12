@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { resetPopupSession } from "@/components/UserPopups";
 
 const AuthContext = createContext(null);
 
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }) => {
   }, [refresh]);
 
   const login = async (email, password) => {
+    resetPopupSession();
     const { data } = await api.post("/auth/login", { email, password });
     setUser(data);
     return data;
@@ -32,6 +34,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    resetPopupSession();
     try {
       await api.post("/auth/logout");
     } catch {}
