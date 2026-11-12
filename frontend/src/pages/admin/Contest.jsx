@@ -68,6 +68,7 @@ export default function AdminContest() {
   return (
     <>
       <PageHeader eyebrow="Growth" title="Promo contest" desc="Review players' share screenshots and pick winners for bonus credits. Credits are added to the winner's balance right away." />
+      {user?.role !== "admin" && <p className="mb-4 text-xs text-amber-300" data-testid="admin-contest-staff-note">Only the admin can pay winners. You can review and reject entries.</p>}
       <Tabs value={status} onValueChange={setStatus}>
         <TabsList className="mb-6 bg-black/40" data-testid="admin-contest-tabs">
           {["pending", "winner", "rejected"].map((s) => (

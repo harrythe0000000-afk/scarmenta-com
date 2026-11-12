@@ -52,7 +52,7 @@ const UploadBox = ({ onDone }) => {
       </ol>
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border border-dashed border-purple-500/30 p-4 text-sm text-slate-300 hover:bg-white/[0.03]">
         {preview ? <img src={preview} alt="Preview" className="max-h-56 rounded-lg object-contain" data-testid="contest-preview" /> : <><ImagePlus className="h-6 w-6 text-purple-300" /> Choose screenshot (JPG, PNG, WEBP · max 5 MB)</>}
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" data-testid="contest-file-input" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" data-testid="contest-file-input" onChange={(e) => { setFile(e.target.files?.[0] || null); e.target.value = ""; }} />
       </label>
       <Input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={200} placeholder="Where did you post it? (optional)" data-testid="contest-caption-input" className="border-purple-500/20 bg-black/40" />
       <Button disabled={busy || !file} data-testid="contest-submit-button" className="w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 font-semibold">

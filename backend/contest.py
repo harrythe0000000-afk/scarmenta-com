@@ -109,7 +109,7 @@ async def pick_winner(eid: str, body: WinIn, admin: dict = Depends(require_admin
                                            projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
     if u:
         await db.transactions.insert_one(make_tx(u, "contest_bonus", "credit", amt, "Promo contest winner bonus",
-                                                 eid, u["promo_balance"]))
+                                                 f"CON-{eid[:6].upper()}", u["promo_balance"]))
     return entry_out(e, full=True)
 
 

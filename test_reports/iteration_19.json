@@ -1,0 +1,31 @@
+{
+  "summary": "Tested the Promo Screenshot Contest end to end (backend and frontend). Backend: 12 of 12 pytest tests pass. Covered: uploads (valid PNG with and without a caption -> pending; .txt and fake .png -> 400; over 5 MB -> 400 with the backend message; admin, staff and agent -> 403; no login -> 401), visibility (/contest/me; who can see an image: the owner and staff/admin always, another player gets 404 until the entry wins, then 200), the admin list with counts (bad status -> 422; player -> 403), winner payout (staff -> 403; amount 0 or 20000 -> 422; 12.345 is rounded to 12.35 and credited to promo_balance once; a second win call -> 400; exactly one contest_bonus credit transaction; winners list shows the masked name 'De***o' with no email), and reject (staff can reject with a note; rejecting or winning an already-reviewed entry -> 400). Frontend: the player page opens from the nav, the preview shows, submit shows a toast, the new entry shows 'In review', winners show 'Winner · $X', and the winners gallery shows the masked name. The admin page works: tab counts, card image, zoom dialog, winner with amount 7.5 (toast 'Paid $7.50 bonus', card moves to Winners, counts update). Staff see no amount box or Winner button, and their reject moves the card to Rejected. The player statement shows two 'Contest Prize' credit rows. Mobile at 390px has no sideways scroll. No page errors. One small UI bug: you cannot pick the same file again right after submitting.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "POST /api/contest/entries", "issue": "content_type comes from the file extension, not the real image format (a JPEG renamed .png is stored and served as image/png). Browsers handle this, but it would be better to use Image.format. The whole upload is also read into memory before the size check, so huge uploads are not cut off early."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Contest UploadBox", "issue": "After a successful submit, the file is cleared in state but the <input type=file> value is not. If the player picks the same file again, no change event fires, so no preview appears and Submit stays disabled. Confirmed in Playwright. Fix: reset e.target.value = '' in onChange, or reset the input with a ref or key after submit.", "selector": "[data-testid=contest-file-input]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Statement", "issues": ["Contest Prize rows show the full entry UUID as the reference (e.g. '· 67b32e55-5e1e-...'). Other rows use short refs like DEP-xxxx. Consider a short ref such as CON-xxxxxx."]},
+      {"screen": "Admin contest (staff)", "issues": ["The page text says 'pick winners for bonus credits' for staff too, but staff can only reject. Optional: show a 'Only the admin can pay winners' note for staff."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_promo_contest.py", "/app/test_reports/pytest/pytest_contest.xml"],
+  "action_items": [
+    "Reset the contest file input value after submit, or in onChange, so the player can pick the same file again (LOW).",
+    "Optional: use the detected image format for content_type; use a short reference for contest_bonus transactions; add a staff-only note on the admin contest page."
+  ],
+  "critical_code_review_comments": [
+    "pick_winner sets the entry to winner before crediting the user. If the user doc is missing, the entry is marked winner but no credit or transaction is made, and no error is shown. This is acceptable but worth logging.",
+    "There is no per-user upload limit, which matches the spec ('no upload limit'). Any player can still fill object storage with many 5 MB uploads. Consider a soft rate limit."
+  ],
+  "updated_files": ["/app/backend/tests/test_promo_contest.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "Created 4 contest entries for demo@aetheria.io (2 winners: $12.35 and $7.50; 2 rejected) and 2 contest_bonus transactions. All were cleaned up: entries and transactions deleted by id, and demo promo_balance reverted to 1039 (the starting value). Stored image objects stay in object storage because there is no delete API.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && REACT_APP_BACKEND_URL=... MONGO_URL=... pytest tests/test_promo_contest.py -n 0 (the tests depend on order). The test checks transactions directly in mongo. Clean up afterwards: decrement demo promo_balance by the sum of the contest_bonus tx amounts, then delete the transactions and contest_entries by id. Player login: /login (login-email-input / login-password-input + Enter). Admin and staff login: /admin (admin-login-email-input)."
+}

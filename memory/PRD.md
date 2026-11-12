@@ -115,3 +115,8 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Session Portfolio bar (P/L, rounds, wins, losses, win rate, biggest win)
 - Hot Streak share image (1080x1350, referral code + link, no demo note per user) via shareBlob (Web Share / download + api.whatsapp.com)
 - Tests: iteration_18.json; fixed mobile tab overflow, small card text, WhatsApp emoji, Reset clears best
+
+## 2026-11-12 Promo screenshot contest
+- Players /app/contest: upload share screenshot (object storage, no limit), my entries status, winners gallery (masked)
+- Admin/staff /admin/contest: pending/winners/rejected; admin enters bonus per winner -> promo_balance + tx contest_bonus (ref CON-xxxxxx); staff can reject only
+- backend/contest.py; tests iteration_19.json pass
