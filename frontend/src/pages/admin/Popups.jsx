@@ -93,7 +93,7 @@ const NewPopup = ({ onDone }) => {
           <Input type="datetime-local" data-testid="popup-start-input" value={f.starts_at} onChange={set("starts_at")} className={inputCls} />
         </label>
         <label className="space-y-1 text-xs text-slate-400">End (IST, optional)
-          <Input type="datetime-local" data-testid="popup-end-input" value={f.ends_at} min={f.starts_at || undefined} onChange={set("ends_at")} className={inputCls} />
+          <Input type="datetime-local" data-testid="popup-end-input" value={f.ends_at} onChange={set("ends_at")} className={inputCls} />
         </label>
       </div>
       <p className="text-xs text-slate-500">Leave empty to show right away and keep it on until you turn it off.</p>
@@ -136,7 +136,7 @@ const PopupRow = ({ b, reload }) => {
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-white">{b.title}</p>
         <p className="truncate text-xs text-slate-400">{b.text}</p>
-        <p className="mt-1 text-xs text-slate-500">{b.audience.map((a) => (a === "user" ? "Players" : "Agents")).join(" + ")} · {fmtDate(b.created_at)}</p>
+        <p className="mt-1 text-xs text-slate-500">{b.audience.map((a) => (a === "user" ? "Players" : "Agents")).join(" + ")} · created {fmtIst(b.created_at)} IST</p>
         {(b.starts_at || b.ends_at) && (
           <p className="mt-1 text-xs text-slate-400" data-testid={`popup-schedule-${b.id}`}>
             {b.starts_at ? fmtIst(b.starts_at) : "Now"} → {b.ends_at ? fmtIst(b.ends_at) : "No end"} IST

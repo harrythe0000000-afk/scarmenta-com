@@ -188,7 +188,7 @@ async def active_banners(user: dict = Depends(get_current_user)):
 
 @router.post("/banners/{bid}/event")
 async def banner_event(bid: str, body: BannerEventIn, user: dict = Depends(get_current_user)):
-    if not await db.banners.find_one({"id": bid, "deleted": {"$ne": True}, "audience": user["role"]}, {"_id": 1}):
+    if not await db.banners.find_one({"id": bid, "active": True, "deleted": {"$ne": True}, "audience": user["role"]}, {"_id": 1}):
         raise HTTPException(status_code=404, detail="Popup not found")
     key = {"banner_id": bid, "user_id": user["id"], "type": body.type}
     await db.banner_events.update_one(key, {"$setOnInsert": {**key, "created_at": now_iso()}}, upsert=True)

@@ -1,0 +1,35 @@
+{
+  "summary": "Tested popup unique view/click stats and IST scheduling (backend + UI), with regression checks on toggle, delete and terms. Backend: 24 of 24 pytest tests pass (13 new in test_popup_stats_schedule.py, 11 from the earlier test_popups_terms.py). UI: admin created a Live popup (start -30 min, end +150 min IST) and the row showed 'Live' with '12 Nov, 04:05 pm → 12 Nov, 07:05 pm IST', which matches what was entered. The future-start popup showed 'Scheduled' and players did not see it. The no-schedule popup showed 'Live' and players saw it. An end time in the past gave the toast 'End time is already in the past'. The demo player saw and tapped the popup, then logged out, logged back in and did it again: counts stayed at 1. The agent then saw and tapped it: '2 saw it · 2 tapped button (100%)'. Toggle off/on (Off → Live) and delete work, with the empty state shown after delete. Every popup created during testing was deleted (0 active banners left). One small gap: end-before-start in the UI is stopped by the browser's built-in check (min attribute), not by an error toast.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/banners/{id}/event", "issue": "Records events for popups that are turned off or outside their schedule (it only checks deleted and audience). Small effect on stats; consider also checking active and the time window."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NewPopup end input", "issue": "End before start: the end input has min={starts_at}, so the browser blocks the submit with its own tooltip and no error toast appears. The backend's 'End time must be after start time' message never reaches the user. Expected an error toast. Acceptable, but different from the spec.", "selector": "[data-testid='popup-end-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Popups row", "issues": ["The created date (fmtDate) uses the browser's local time zone, while the schedule line is fixed to IST. The same row can show '11:05' (created) next to '04:05 pm IST', which is confusing. Consider showing the created time in IST too.", "The schedule inputs use the browser's own datetime-local picker, not the shadcn calendar (acceptable, but the style differs)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_popup_stats_schedule.py", "/app/backend/tests/test_popups_terms.py", "/app/test_reports/pytest/pytest_results_iter12.xml"],
+  "action_items": [
+    "Optional: show the backend error for end-before-start as a toast (for example, drop the min attribute or check it in submit) so users get the clear message",
+    "Optional: in banner_event, reject events for popups that are turned off or outside their schedule",
+    "Optional: show the created time in IST to match the schedule line"
+  ],
+  "critical_code_review_comments": [
+    "content.py: compares UTC ISO strings as text (utc_iso and now_iso both give +00:00, so this works). The frontend phase() compares '+00:00' strings with toISOString() 'Z' strings, which only goes wrong in the same second. Fine.",
+    "The unique index banner_user_type on banner_events plus $setOnInsert upsert keeps counts unique. The double view POST from StrictMode is harmless.",
+    "toIst appends ':00+05:30'. If a browser ever returns seconds in datetime-local (step < 60), the value would be malformed. The default step is fine."
+  ],
+  "updated_files": ["/app/backend/tests/test_popup_stats_schedule.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "TEST_ popups were created and all deleted (soft delete). Their banner_events rows stay, linked to the deleted popups. Before the UI tests, terms were accepted for demo@aetheria.io and agent@aetheria.io through POST /api/terms/accept. Note: the existing regression test test_popups_terms.py::test_terms_flow calls /admin/terms/require-reaccept, which asks all real players and agents to re-accept the terms (6 pending now).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with the default ini (do not pass -p no:xdist; use -n 0 for a serial run). test_popup_stats_schedule.py backdates ends_at in Mongo for one test (it needs MONGO_URL and DB_NAME from backend/.env). Admin nav has no data-testid; click the 'Popups & Terms' text. Wait for the URL to stop containing 'login' rather than '**/admin**'. Second player: agentplayer1@example.com / Player@123."
+}

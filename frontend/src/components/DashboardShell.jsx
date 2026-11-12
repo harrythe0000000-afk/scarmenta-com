@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
 import { TermsReaccept, useTermsRequired } from "@/components/TermsReaccept";
 import { UserPopups } from "@/components/UserPopups";
+import { ChatWidget } from "@/components/ChatWidget";
 
 const VerifyBanner = () => {
   const [busy, setBusy] = useState(false);
@@ -92,6 +93,7 @@ export default function DashboardShell({ nav: allNav, area }) {
           {user?.role === "user" && !user.email_verified && <VerifyBanner />}
           {termsRequired && <TermsReaccept onDone={() => setTermsRequired(false)} />}
           {termsRequired === false && (user?.role === "user" || user?.role === "agent") && <UserPopups />}
+          {user?.role === "user" && <ChatWidget />}
           <Outlet />
         </div>
       </main>

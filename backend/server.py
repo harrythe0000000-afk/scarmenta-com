@@ -8,6 +8,7 @@ import referrals
 import rewards
 import agents
 import content
+import assistant
 
 import asyncio
 import logging
@@ -60,6 +61,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "login_attempts": [IndexModel([("identifier", ASCENDING)], name="identifier")],
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
+    "chat_messages": [IndexModel([("user_id", ASCENDING), ("session_id", ASCENDING), ("created_at", ASCENDING)], name="user_session")],
     "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
                                  name="banner_user_type", unique=True)],
 }
@@ -876,6 +878,7 @@ app.include_router(games.router)
 app.include_router(rewards.router)
 app.include_router(agents.router)
 app.include_router(content.router)
+app.include_router(assistant.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 

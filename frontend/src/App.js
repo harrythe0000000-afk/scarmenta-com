@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -33,6 +33,7 @@ import AdminStaff from "@/pages/admin/Staff";
 import AdminAgents from "@/pages/admin/Agents";
 import AdminPopups from "@/pages/admin/Popups";
 import UserTransfer from "@/pages/user/Transfer";
+import UserCalculator from "@/pages/user/Calculator";
 import AgentDashboard from "@/pages/agent/Dashboard";
 
 const USER_NAV = [
@@ -40,6 +41,7 @@ const USER_NAV = [
   { id: "user-deposits", to: "/app/deposits", label: "Deposits", icon: ArrowDownToLine },
   { id: "user-transfer", to: "/app/transfer", label: "Transfer", icon: ArrowLeftRight },
   { id: "user-games", to: "/app/games", label: "Games", icon: Gamepad2 },
+  { id: "user-calculator", to: "/app/calculator", label: "Calculator", icon: Calculator },
   { id: "user-refer", to: "/app/refer", label: "Refer & Earn", icon: Gift },
   { id: "user-rewards", to: "/app/rewards", label: "Loss Rewards", icon: Award },
   { id: "user-statement", to: "/app/statement", label: "Statement", icon: ScrollText },
@@ -90,6 +92,7 @@ function App() {
             <Route path="deposits" element={<UserDeposits />} />
             <Route path="transfer" element={<UserTransfer />} />
             <Route path="games" element={<UserGames />} />
+            <Route path="calculator" element={<UserCalculator />} />
             <Route path="refer" element={<UserRefer />} />
             <Route path="rewards" element={<UserRewards />} />
             <Route path="statement" element={<UserStatement />} />
