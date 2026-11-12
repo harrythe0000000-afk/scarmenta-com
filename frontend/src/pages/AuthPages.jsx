@@ -95,8 +95,7 @@ export const Login = () => {
   const [mode, setMode] = useState("password");
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your Scarmenta account."
-      footer={<div className="flex flex-wrap justify-between gap-2"><span>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></span>
-        <Link to="/admin/login" className="text-[#F2B94B] hover:text-amber-200" data-testid="login-to-admin-link">Admin login →</Link></div>}>
+      footer={<>New here? <Link to="/register" className="text-purple-300 hover:text-purple-200" data-testid="login-to-register-link">Create an account</Link></>}>
       <div className="mb-6 grid grid-cols-2 gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid="login-mode-toggle">
         {[["password", "Password"], ["otp", "Email code (OTP)"]].map(([v, l]) => (
           <button key={v} type="button" data-testid={`login-mode-${v}`} onClick={() => setMode(v)}

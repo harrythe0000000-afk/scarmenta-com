@@ -16,7 +16,17 @@ class AgentIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    commission_percent: float = Field(ge=0, le=50)
+    commission_percent: Optional[float] = Field(default=None, ge=0, le=50)
+
+
+TIERS = [(10, 5.0), (50, 7.0), (None, 10.0)]
+TIER_TEXT = "1–10 players: 5% · 11–50 players: 7% · 51+ players: 10%"
+
+
+def tier_rate(players: int) -> float:
+    for limit, rate in TIERS:
+        if limit is None or players <= limit:
+            return rate
 
 
 class AgentUpdateIn(BaseModel):
@@ -60,14 +70,15 @@ async def reward_agent(dep: dict) -> None:
     agent = await db.users.find_one({"id": player["agent_id"], "role": "agent", "status": "active"}, {"_id": 0})
     if not agent:
         return
-    amount = round(dep["amount"] * agent["commission_percent"] / 100, 2)
+    rate = tier_rate(await db.users.count_documents({"agent_id": agent["id"]}))
+    amount = round(dep["amount"] * rate / 100, 2)
     res = await db.deposits.update_one({"id": dep["id"], "agent_commission_done": {"$ne": True}},
                                        {"$set": {"agent_commission_done": True, "agent_id": agent["id"]}})
     if not res.modified_count or amount <= 0:
         return
     await db.agent_commissions.insert_one({
         "id": new_id(), "agent_id": agent["id"], "player_id": dep["user_id"], "player_name": mask_name(player["name"]),
-        "deposit_ref": dep["reference"], "deposit_amount": dep["amount"], "percent": agent["commission_percent"],
+        "deposit_ref": dep["reference"], "deposit_amount": dep["amount"], "percent": rate,
         "amount": amount, "status": "unpaid", "created_at": now_iso()})
 
 
@@ -76,7 +87,7 @@ async def reward_agent(dep: dict) -> None:
 async def list_agents(_: dict = Depends(require_staff)):
     agents = await db.users.find({"role": "agent"}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
     stats = await _stats([a["id"] for a in agents])
-    return [{**a, **stats[a["id"]]} for a in agents]
+    return [{**a, **stats[a["id"]], "current_rate": tier_rate(stats[a["id"]]["players"])} for a in agents]
 
 
 @router.post("/admin/agents")
@@ -88,7 +99,7 @@ async def create_agent(body: AgentIn, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="An account with this email already exists")
     agent = {"id": new_id(), "email": email, "name": body.name.strip(), "password_hash": hash_password(body.password),
              "role": "agent", "status": "active", "email_verified": True, "promo_balance": 0.0,
-             "agent_code": await _code(), "commission_percent": body.commission_percent,
+             "agent_code": await _code(), "commission_percent": None,
              "created_by": admin["email"], "created_at": now_iso()}
     await db.users.insert_one(agent)
     return clean(agent)
@@ -110,6 +121,8 @@ async def update_agent(agent_id: str, body: AgentUpdateIn, _: dict = Depends(req
 async def payout(agent_id: str, body: PayoutIn, admin: dict = Depends(require_admin)):
     if not await db.users.find_one({"id": agent_id, "role": "agent"}):
         raise HTTPException(status_code=404, detail="Agent not found")
+    if not await db.agent_commissions.count_documents({"agent_id": agent_id, "status": "unpaid"}):
+        raise HTTPException(status_code=400, detail="No unpaid commission for this agent")
     pid = new_id()
     await db.agent_commissions.update_many({"agent_id": agent_id, "status": "unpaid"},
                                            {"$set": {"status": "paid", "payout_id": pid, "paid_at": now_iso()}})
@@ -142,7 +155,7 @@ async def agent_me(request: Request, agent: dict = Depends(require_agent)):
         {"$match": {"user_id": {"$in": [p["id"] for p in players]}, "status": "approved"}},
         {"$group": {"_id": "$user_id", "v": {"$sum": "$amount"}}}]).to_list(10000)}
     return {
-        "name": agent["name"], "code": agent["agent_code"], "commission_percent": agent["commission_percent"],
+        "name": agent["name"], "code": agent["agent_code"], "commission_percent": tier_rate(len(players)), "tiers": TIER_TEXT,
         "link": f"{site_url(request)}/register?agent={agent['agent_code']}",
         **(await _stats([agent["id"]]))[agent["id"]],
         "players_list": [{"name": mask_name(p["name"]), "joined_at": p["created_at"], "deposited": round(vol.get(p["id"], 0), 2)}

@@ -19,7 +19,7 @@ const NewAgent = ({ onDone }) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data } = await api.post("/admin/agents", { ...f, commission_percent: Number(f.commission_percent) });
+      const { data } = await api.post("/admin/agents", { name: f.name, email: f.email, password: f.password });
       toast.success(`Agent created with code ${data.agent_code}. Share the login with them securely.`);
       setF({ name: "", email: "", password: "", commission_percent: 5 });
       onDone();
@@ -36,10 +36,7 @@ const NewAgent = ({ onDone }) => {
       <Input data-testid="agent-name-input" required minLength={2} placeholder="Full name" value={f.name} onChange={set("name")} className={cls} />
       <Input data-testid="agent-email-input" required type="email" placeholder="Login email" value={f.email} onChange={set("email")} className={cls} />
       <Input data-testid="agent-password-input" required minLength={8} placeholder="Temporary password (min 8)" value={f.password} onChange={set("password")} className={`${cls} font-num`} />
-      <div>
-        <p className="mb-1.5 text-[11px] uppercase tracking-wider text-slate-500">Commission (% of each deposit)</p>
-        <Input data-testid="agent-commission-input" required type="number" min={0} max={50} step="0.5" value={f.commission_percent} onChange={set("commission_percent")} className={`${cls} font-num`} />
-      </div>
+      <p className="rounded-lg border border-white/5 bg-black/30 px-3 py-2 text-xs text-slate-400">Commission is automatic by number of players: 1–10 → 5%, 11–50 → 7%, 51+ → 10% of each deposit.</p>
       <Button data-testid="agent-create-button" disabled={busy} className="w-full rounded-full bg-purple-600 hover:bg-purple-500"><Plus className="mr-2 h-4 w-4" /> Create agent</Button>
       <p className="text-xs text-slate-500">Agents sign in on the normal login page and see their own portal with their sign-up link.</p>
     </form>
@@ -59,10 +56,6 @@ export default function AdminAgents() {
       toast.error(formatApiError(e));
     }
   };
-  const editRate = (a) => {
-    const v = window.prompt(`New commission % for ${a.name}`, a.commission_percent);
-    if (v !== null && v !== "") act(() => api.patch(`/admin/agents/${a.id}`, { commission_percent: Number(v) }), "Commission updated");
-  };
   const pay = (a) => {
     if (!window.confirm(`Mark ${usd(a.unpaid)} as paid to ${a.name}? Pay them outside the platform first.`)) return;
     const note = window.prompt("Payout note (e.g. USDT TX hash)", "") || "";
@@ -70,7 +63,7 @@ export default function AdminAgents() {
   };
   return (
     <>
-      <PageHeader eyebrow="Agents" title="Agent accounts & commission" desc="Agents bring players with their own sign-up link and earn a % of every approved deposit those players make." />
+      <PageHeader eyebrow="Agents" title="Agent accounts & commission" desc="Agents bring players with their own sign-up link and earn commission on every approved deposit: 1–10 players 5%, 11–50 players 7%, 51+ players 10%." />
       <div className={`grid gap-6 ${owner ? "lg:grid-cols-[340px_1fr]" : ""}`}>
         {owner && <NewAgent onDone={reload} />}
         {!data?.length ? <EmptyState text="No agents yet." testId="agents-empty" /> : (
@@ -84,7 +77,7 @@ export default function AdminAgents() {
                   <TableRow key={a.id} className="border-white/5" data-testid={`agent-row-${a.email}`}>
                     <TableCell><p className="text-sm text-white">{a.name}</p><p className="text-xs text-slate-500">{a.email}</p></TableCell>
                     <TableCell className="font-num text-xs text-[#F2B94B]">{a.agent_code}</TableCell>
-                    <TableCell className="font-num text-sm">{a.commission_percent}%</TableCell>
+                    <TableCell className="font-num text-sm" data-testid={`agent-rate-${a.email}`}>{a.current_rate}%</TableCell>
                     <TableCell className="font-num text-sm">{a.players}</TableCell>
                     <TableCell className="font-num text-sm text-emerald-300">{usd(a.volume)}</TableCell>
                     <TableCell className="font-num text-sm">{usd(a.earned)}</TableCell>
@@ -94,7 +87,6 @@ export default function AdminAgents() {
                     <TableCell>
                       {owner && (
                         <div className="flex gap-1.5">
-                          <Button size="sm" variant="outline" data-testid={`agent-rate-btn-${a.email}`} onClick={() => editRate(a)} className="rounded-full border-purple-500/30 bg-transparent px-2.5 text-xs hover:bg-purple-500/10">Rate</Button>
                           <Button size="sm" disabled={!a.unpaid} data-testid={`agent-pay-btn-${a.email}`} onClick={() => pay(a)} className="rounded-full bg-emerald-600 px-2.5 text-xs hover:bg-emerald-500">Pay</Button>
                           <Button size="sm" variant="outline" data-testid={`agent-toggle-btn-${a.email}`} onClick={() => act(() => api.patch(`/admin/agents/${a.id}`, { status: a.status === "active" ? "suspended" : "active" }), "Status updated")}
                             className="rounded-full border-red-500/30 bg-transparent px-2.5 text-xs text-red-300 hover:bg-red-500/10">{a.status === "active" ? "Disable" : "Enable"}</Button>

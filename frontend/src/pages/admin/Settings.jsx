@@ -84,7 +84,7 @@ export default function AdminSettings() {
       const { fee_percent, ...rest } = s;
       const body = { ...rest, packages, min_deposit: Number(s.min_deposit), max_deposit: Number(s.max_deposit),
         fraud_amount_threshold: Number(s.fraud_amount_threshold), fraud_velocity_count: Number(s.fraud_velocity_count), referral_bonus_percent: Number(s.referral_bonus_percent),
-        loss_reward_percent: Number(s.loss_reward_percent),
+        loss_reward_percent: Number(s.loss_reward_percent), transfer_fee_percent: Number(s.transfer_fee_percent),
         fx_rates: Object.fromEntries(rates.filter((r) => r.code.trim()).map((r) => [r.code.trim().toUpperCase(), Number(r.rate)])) };
       const { data: saved } = await api.put("/admin/settings", body);
       setS(saved);
@@ -132,7 +132,8 @@ export default function AdminSettings() {
           <p className="label-eyebrow">Refer & earn · Loss rewards</p>
           <NumField label="Referral income (% of every friend's deposit)" value={s.referral_bonus_percent} onChange={set("referral_bonus_percent")} testId="settings-referral-bonus" />
           <NumField label="Weekly loss reward (% of a player's net loss)" value={s.loss_reward_percent} onChange={set("loss_reward_percent")} testId="settings-loss-reward" />
-          <p className="text-xs text-slate-500">Set either to 0 to switch it off.</p>
+          <NumField label="Account transfer fee (%)" value={s.transfer_fee_percent} onChange={set("transfer_fee_percent")} testId="settings-transfer-fee" />
+          <p className="text-xs text-slate-500">Set any of these to 0 to switch it off.</p>
           <label className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300">
             Email owner & staff when a new deposit is waiting
             <Switch data-testid="settings-deposit-alerts-switch" checked={!!s.deposit_alerts} onCheckedChange={(v) => setS({ ...s, deposit_alerts: v })} />

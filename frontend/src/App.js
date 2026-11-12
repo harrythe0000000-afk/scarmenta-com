@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -29,11 +29,13 @@ import AdminMoneyFlow from "@/pages/admin/MoneyFlow";
 import AccountSettings from "@/pages/AccountSettings";
 import AdminStaff from "@/pages/admin/Staff";
 import AdminAgents from "@/pages/admin/Agents";
+import UserTransfer from "@/pages/user/Transfer";
 import AgentDashboard from "@/pages/agent/Dashboard";
 
 const USER_NAV = [
   { id: "user-overview", to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
   { id: "user-deposits", to: "/app/deposits", label: "Deposits", icon: ArrowDownToLine },
+  { id: "user-transfer", to: "/app/transfer", label: "Transfer", icon: ArrowLeftRight },
   { id: "user-games", to: "/app/games", label: "Games", icon: Gamepad2 },
   { id: "user-refer", to: "/app/refer", label: "Refer & Earn", icon: Gift },
   { id: "user-rewards", to: "/app/rewards", label: "Loss Rewards", icon: Award },
@@ -80,6 +82,7 @@ function App() {
           <Route path="/app" element={<ProtectedRoute role="user"><DashboardShell nav={USER_NAV} area="Player Account" /></ProtectedRoute>}>
             <Route index element={<UserOverview />} />
             <Route path="deposits" element={<UserDeposits />} />
+            <Route path="transfer" element={<UserTransfer />} />
             <Route path="games" element={<UserGames />} />
             <Route path="refer" element={<UserRefer />} />
             <Route path="rewards" element={<UserRewards />} />

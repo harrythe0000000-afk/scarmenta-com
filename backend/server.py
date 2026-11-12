@@ -41,6 +41,8 @@ INDEXES: dict[str, list[IndexModel]] = {
     "tickets": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                 IndexModel([("user_id", ASCENDING), ("updated_at", DESCENDING)], name="user_updated")],
     "fraud_alerts": [IndexModel([("status", ASCENDING), ("created_at", DESCENDING)], name="status_created")],
+    "transfers": [IndexModel([("from_user_id", ASCENDING), ("created_at", DESCENDING)], name="from_created"),
+                  IndexModel([("to_user_id", ASCENDING), ("created_at", DESCENDING)], name="to_created")],
     "agent_commissions": [IndexModel([("agent_id", ASCENDING), ("created_at", DESCENDING)], name="agent_created")],
     "providers": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                   IndexModel([("code", ASCENDING)], name="code", unique=True),
@@ -108,6 +110,12 @@ class StaffIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class TransferIn(BaseModel):
+    to_email: EmailStr
+    to_password: str
+    amount: float = Field(gt=0)
+
+
 class TokenIn(BaseModel):
     token: str
 
@@ -164,6 +172,7 @@ class SettingsIn(BaseModel):
     referral_bonus_percent: float = Field(ge=0, le=100)
     loss_reward_percent: float = Field(ge=0, le=100)
     deposit_alerts: bool
+    transfer_fee_percent: float = Field(ge=0, le=50)
     packages: List[float] = Field(min_length=1, max_length=8)
     fx_rates: Dict[str, float]
     upi_id: str = Field(max_length=100)
@@ -427,7 +436,7 @@ async def reset_password(body: ResetIn):
 async def public_config():
     s = await get_settings()
     out = {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages", "fx_rates",
-                             "referral_bonus_percent", "loss_reward_percent")}
+                             "referral_bonus_percent", "loss_reward_percent", "transfer_fee_percent")}
     out["currency"] = "USD"
     out["payment"] = {"upi_id": s["upi_id"], "usdt": {n: s[k] for n, k in NETWORKS.items()}}
     return out
@@ -445,6 +454,9 @@ async def wallet(user: dict = Depends(get_current_user)):
     return {"balance": user.get("promo_balance", 0), "total_deposited": totals["deposited"],
             "total_credits": totals["credits"], "approved_count": totals["count"], "pending_count": pending,
             "referral_earnings": user.get("referral_earnings", 0), "loss_rewards": user.get("loss_rewards_total", 0)}
+
+
+BG_TASKS: set = set()
 
 
 async def notify_staff(dep: dict, base_url: str) -> None:
@@ -501,8 +513,62 @@ async def create_deposit(body: DepositIn, request: Request, user: dict = Depends
     if "velocity" in flags:
         await add_alert("velocity", "medium", f"{recent + 1} deposits in 24h by {user['email']}", user, dep["reference"])
     if s.get("deposit_alerts", True):
-        asyncio.create_task(notify_staff(dict(dep), site_url(request)))
+        task = asyncio.create_task(notify_staff(dict(dep), site_url(request)))
+        BG_TASKS.add(task)
+        task.add_done_callback(BG_TASKS.discard)
     return clean(dep)
+
+
+@api.post("/transfers")
+async def create_transfer(body: TransferIn, user: dict = Depends(get_current_user)):
+    if user.get("role") != "user":
+        raise HTTPException(status_code=403, detail="Only player accounts can transfer")
+    ident = f"transfer:{user['id']}"
+    att = await db.login_attempts.find_one({"identifier": ident})
+    if att and att.get("locked_until") and att["locked_until"] > now_iso():
+        raise HTTPException(status_code=429, detail="Too many wrong passwords. Try again in 15 minutes.")
+    to = await db.users.find_one({"email": body.to_email.lower(), "role": "user"})
+    if not to or to["id"] == user["id"]:
+        raise HTTPException(status_code=400, detail="Enter the email of your other player account")
+    if not verify_password(body.to_password, to["password_hash"]):
+        count = (att or {}).get("count", 0) + 1
+        update = {"count": 0, "locked_until": (now() + timedelta(minutes=15)).isoformat()} if count >= 5 else {"count": count}
+        await db.login_attempts.update_one({"identifier": ident}, {"$set": update}, upsert=True)
+        raise HTTPException(status_code=429 if count >= 5 else 401, detail="The password for the receiving account is incorrect")
+    await db.login_attempts.delete_one({"identifier": ident})
+    if to.get("status") != "active":
+        raise HTTPException(status_code=400, detail="The receiving account is not active")
+    s = await get_settings()
+    amount = round(body.amount, 2)
+    fee = round(amount * s["transfer_fee_percent"] / 100, 2)
+    net = round(amount - fee, 2)
+    src = await db.users.find_one_and_update({"id": user["id"], "promo_balance": {"$gte": amount}},
+                                             {"$inc": {"promo_balance": -amount}},
+                                             projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    if not src:
+        raise HTTPException(status_code=400, detail="Insufficient balance")
+    dst = await db.users.find_one_and_update({"id": to["id"]}, {"$inc": {"promo_balance": net}},
+                                             projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    ref = f"TRF-{secrets.token_hex(4).upper()}"
+    rec = {"id": new_id(), "reference": ref, "from_user_id": user["id"], "from_email": user["email"], "to_user_id": to["id"],
+           "to_email": to["email"], "amount": amount, "fee_percent": s["transfer_fee_percent"], "fee": fee, "net": net,
+           "created_at": now_iso()}
+    await db.transfers.insert_one(dict(rec))
+    await db.transactions.insert_many([
+        make_tx(src, "transfer_out", "credit", -amount, f"Transfer to {to['email']} (incl. {s['transfer_fee_percent']:g}% fee ${fee:,.2f})", ref, src["promo_balance"]),
+        make_tx(dst, "transfer_in", "credit", net, f"Transfer from {user['email']}", ref, dst["promo_balance"])])
+    return rec
+
+
+@api.get("/transfers")
+async def my_transfers(user: dict = Depends(get_current_user)):
+    return await db.transfers.find({"$or": [{"from_user_id": user["id"]}, {"to_user_id": user["id"]}]}, {"_id": 0}
+                                   ).sort("created_at", -1).to_list(500)
+
+
+@api.get("/admin/transfers")
+async def admin_transfers(_: dict = Depends(require_staff)):
+    return await db.transfers.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
 
 @api.get("/deposits")

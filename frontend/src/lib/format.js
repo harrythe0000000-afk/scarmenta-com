@@ -31,6 +31,8 @@ export const TX_TYPES = {
   rollback: "Bet Refund",
   referral_bonus: "Referral Income",
   loss_reward: "Loss Reward",
+  transfer_out: "Transfer Out",
+  transfer_in: "Transfer In",
   admin_adjustment: "Adjustment",
 };
 

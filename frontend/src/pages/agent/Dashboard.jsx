@@ -22,7 +22,7 @@ export default function AgentDashboard() {
   const copy = (v) => { navigator.clipboard.writeText(v).catch(() => {}); toast.success("Copied"); };
   return (
     <>
-      <PageHeader eyebrow="Agent portal" title={`Welcome, ${a.name.split(" ")[0]}`} desc={`You earn ${a.commission_percent}% commission on every approved deposit by players who sign up with your link.`} />
+      <PageHeader eyebrow="Agent portal" title={`Welcome, ${a.name.split(" ")[0]}`} desc={`Your current rate is ${a.commission_percent}% on every approved deposit by your players. Tiers: ${a.tiers}.`} />
       <div className="relative overflow-hidden rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/40 to-[#05040A] p-8 glow-violet" data-testid="agent-link-card">
         <p className="text-xs uppercase tracking-[0.2em] text-[#F2B94B]">Your agent code</p>
         <p className="mt-2 font-num text-4xl font-bold tracking-widest text-white" data-testid="agent-code-value">{a.code}</p>
