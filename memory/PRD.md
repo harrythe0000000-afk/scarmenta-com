@@ -60,3 +60,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## 2026-11-12 Privacy Policy page
 - Public /privacy page (content in frontend/src/lib/privacy.js) — PLACEHOLDER text until user sends real policy
 - Linked from signup Terms checkbox, Terms sections 11 & 16, and /privacy links back to /terms
+
+## 2026-11-12 Popups & Terms re-accept
+- Admin page /admin/popups (owner only): upload image (Emergent object storage, backend/content.py), title, text, optional button (internal /path or https link), audience Players/Agents, preview, live toggle, soft delete
+- Players/agents see active popups once per login (sessionStorage scarmenta_popups_seen cleared on login/logout)
+- Admin "Ask all users to re-accept" sets settings.terms.reaccept_at; users with older terms_accepted_at get blocking scroll-to-accept dialog; stats accepted/pending
+- Tests: backend/tests/test_popups_terms.py, test_reports/iteration_11.json (pass)

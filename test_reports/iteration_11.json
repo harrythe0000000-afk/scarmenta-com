@@ -1,0 +1,36 @@
+{
+  "summary": "Tested admin popup banners (upload/create/preview/toggle/delete/validation), role-filtered popup display for player/agent/staff, the once-per-session popup behaviour, and the terms re-accept flow, on both backend and frontend. I found and fixed one CRITICAL frontend bug: the re-accept dialog's 'Accept & continue' button was hidden, so every player and agent was stuck behind the dialog. After the fix, everything requested passes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/banners/image", "issue": "Validation only checks the file extension. A text file renamed to .png is accepted and served as image/png. The file's bytes are never checked to confirm it is really an image (e.g. via PIL or file.content_type)."},
+      {"endpoint": "GET /api/banners/image/{id}", "issue": "Object storage errors are not caught (get_object raises), so a storage outage gives a raw 500 instead of a handled 502/404."},
+      {"endpoint": "POST /api/admin/banners", "issue": "button_url accepts '//evil.com' because it starts with '/'. The frontend then calls navigate('//evil.com'). Recommend requiring a single leading '/' for internal links."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "TermsReaccept dialog", "issue": "FIXED by testing agent. The DialogContent class '[&>button]:hidden' (meant to hide the Radix close X) also hid the 'Accept & continue' submit button, because that button was a direct child of DialogContent (computed display:none). The dialog cannot be closed with Esc or an outside click, so users were permanently locked out. Fix: wrapped the submit Button in a <div>.", "selector": "[data-testid='terms-reaccept-submit']", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Terms content", "issues": ["TERMS_VERSION is '2026-11-12' and the effective date is '12 November 2026'. This matches the container clock, but check it is the intended real-world date."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_popups_terms.py", "/app/test_reports/pytest/popups_terms.xml"],
+  "action_items": [
+    "Review the TermsReaccept.jsx fix (submit button wrapped in a div so '[&>button]:hidden' only hides the close X). Consider hiding the X with a more specific selector instead.",
+    "Optional: check image bytes on upload (not just the extension), handle storage errors in GET /api/banners/image, and reject '//' protocol-relative button URLs."
+  ],
+  "critical_code_review_comments": [
+    "content.py: the banner_image endpoint has no try/except around the storage fetch, so a storage failure returns a raw 500.",
+    "content.py: deleting a banner only soft-deletes it; the files record and the storage object stay (orphaned images). Minor.",
+    "admin_terms pending count includes suspended users. This is fine but could confuse admins."
+  ],
+  "updated_files": ["/app/frontend/src/components/TermsReaccept.jsx", "/app/backend/tests/test_popups_terms.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% after fix (terms re-accept was 0% before fix)"},
+  "seed_data_creation": "Created popups TEST_UserPopup, TEST_AgentPopup, TEST_BothPopup (via API), plus TEST_UI Popup and TEST_AgentOnly Popup (via UI). All deleted afterwards; only 'Diwali Bonus' remains. Uploaded 1x1 PNG test images (stored in object storage, files records remain). Re-accept was triggered twice. demo@ and agent@ have re-accepted; other users are still pending (6 pending).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_popups_terms.py covers banners RBAC/CRUD/role filter/validation and the terms flow. Run it with '-n 0' if xdist ordering matters (it relies on module-level state, pytest.image_id). Note: test_terms_flow triggers a global re-accept. On the admin login page, wait for nav-admin-popups rather than wait_for_url('**/admin**'), which matches /admin/login immediately."
+}

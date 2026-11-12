@@ -3,7 +3,10 @@ import logging
 import os
 from typing import List, Literal, Optional
 
+import io
+
 import requests
+from PIL import Image
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -79,6 +82,10 @@ async def upload_banner_image(file: UploadFile = File(...), admin: dict = Depend
     data = await file.read()
     if len(data) > MAX_IMAGE:
         raise HTTPException(status_code=400, detail="Image must be 5 MB or smaller")
+    try:
+        Image.open(io.BytesIO(data)).verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="This file is not a valid image")
     fid = new_id()
     try:
         res = await asyncio.to_thread(put_object, f"{APP_NAME}/banners/{fid}.{ext}", data, MIME[ext])
@@ -96,7 +103,11 @@ async def banner_image(fid: str):
     rec = await db.files.find_one({"id": fid, "is_deleted": False}, {"_id": 0})
     if not rec:
         raise HTTPException(status_code=404, detail="Image not found")
-    data = await asyncio.to_thread(get_object, rec["storage_path"])
+    try:
+        data = await asyncio.to_thread(get_object, rec["storage_path"])
+    except Exception as e:
+        logger.error(f"Banner image fetch failed: {e}")
+        raise HTTPException(status_code=502, detail="Image temporarily unavailable")
     return Response(content=data, media_type=rec["content_type"], headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -112,7 +123,8 @@ async def create_banner(body: BannerIn, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Uploaded image not found")
     if bool(body.button_label) != bool(body.button_url):
         raise HTTPException(status_code=400, detail="Button needs both a label and a link")
-    if body.button_url and not body.button_url.startswith(("https://", "http://", "/")):
+    url = body.button_url or ""
+    if url and not (url.startswith(("https://", "http://")) or (url.startswith("/") and not url.startswith(("//", "/\\")))):
         raise HTTPException(status_code=400, detail="Button link must start with https:// or /")
     doc = {"id": new_id(), **body.model_dump(), "audience": sorted(set(body.audience)),
            "created_by": admin["email"], "created_at": now_iso(), "deleted": False}

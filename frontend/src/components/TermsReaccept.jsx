@@ -30,10 +30,12 @@ export const TermsReaccept = ({ onDone }) => {
         <DialogTitle className="font-display text-xl text-white">Our Terms have been updated</DialogTitle>
         <DialogDescription className="text-sm text-slate-400">Please read and accept the updated Terms & Conditions to keep using your account.</DialogDescription>
         <TermsAccept prefix="reaccept" scrolled={scrolled} onScrolled={() => setScrolled(true)} checked={checked} onChange={setChecked} />
-        <Button data-testid="terms-reaccept-submit" disabled={!checked || busy} onClick={accept}
-          className="h-11 w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 font-semibold">
-          {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Accept & continue
-        </Button>
+        <div>
+          <Button data-testid="terms-reaccept-submit" disabled={!checked || busy} onClick={accept}
+            className="h-11 w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 font-semibold">
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Accept & continue
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
