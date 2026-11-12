@@ -16,7 +16,6 @@ class AgentIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    commission_percent: Optional[float] = Field(default=None, ge=0, le=50)
 
 
 TIERS = [(10, 5.0), (50, 7.0), (None, 10.0)]
@@ -30,7 +29,6 @@ def tier_rate(players: int) -> float:
 
 
 class AgentUpdateIn(BaseModel):
-    commission_percent: Optional[float] = Field(default=None, ge=0, le=50)
     status: Optional[Literal["active", "suspended"]] = None
 
 

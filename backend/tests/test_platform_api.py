@@ -17,7 +17,7 @@ ADMIN = ("admin@aetheria.io", "Admin@12345")
 DEMO = ("demo@aetheria.io", "Demo@12345")
 SETTINGS_KEYS = ("promo_multiplier", "min_deposit", "max_deposit", "fraud_amount_threshold", "fraud_velocity_count",
                  "referral_bonus_percent", "loss_reward_percent", "packages", "fx_rates", "upi_id", "usdt_trc20",
-                 "usdt_erc20", "usdt_bep20")
+                 "usdt_erc20", "usdt_bep20", "deposit_alerts", "transfer_fee_percent")
 
 mongo = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 CREATED_USER_IDS = []

@@ -43,3 +43,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - PUT /api/auth/account: change name / login email / password (current password required, 5-try lock). Admin page /admin/account.
 - Seed creates the admin only if NO admin exists (so a changed admin email is never re-created from env).
 - Not built: "potential earning" package claims and the opposite-betting homepage section (misleading); Stripe (does not allow gambling businesses).
+
+## Update — Transfers, agent tiers, deposit alerts, agents
+- Deposit alerts: background email to all active owner+staff on each new deposit (toggle deposit_alerts).
+- Agents: role "agent", portal /agent, sign-up link ?agent=CODE, commission per approved deposit by tier (1–10 players 5%, 11–50 7%, 51+ 10%), owner records payouts.
+- Account transfer: player → own other player account (proved by its password), fee transfer_fee_percent (default 5%), ledger transfer_out/transfer_in, /api/admin/transfers.
+- Admin login links removed from /login and footer; admins use /admin (→ /admin/login) or /login.
+- Declined (again): "potential earning up to 50%" package line — misleading for non-withdrawable credits.

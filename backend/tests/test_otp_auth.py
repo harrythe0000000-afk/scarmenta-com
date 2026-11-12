@@ -63,12 +63,12 @@ class TestPasswordLoginRegression:
 class TestOtp:
     def test_new_referral_code_sm(self):
         u = make_user()
-        assert u["referral_code"].startswith("SM")
+        assert u["referral_code"].startswith("SC")
         s = requests.Session()
         s.post(f"{API}/auth/login", json={"email": u["email"], "password": "Test@12345"})
         r = s.get(f"{API}/referrals/me")
         assert r.status_code == 200
-        assert str(r.json().get("referral_code", r.json().get("code", ""))).startswith("SM"), r.json()
+        assert str(r.json().get("referral_code", r.json().get("code", ""))).startswith("SC"), r.json()
 
     def test_unknown_email_ok(self):
         r = requests.post(f"{API}/auth/otp/request", json={"email": f"nobody_{uuid.uuid4().hex[:6]}@example.com"})

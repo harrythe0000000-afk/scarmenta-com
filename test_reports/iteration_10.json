@@ -1,0 +1,50 @@
+{
+  "summary": "Tested account transfers, the configurable transfer fee, agent commission tiers, removal of the admin-login links, the /admin login route and regressions. New pytest file: 7/7 pass. Full suite: 127/129 pass. The 2 failures are in test_otp_auth.py and are not caused by the app: the referral-code prefix test is outdated, and the email provider rate-limited us (429). Frontend: every requested flow passes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/admin/agents/{id}", "issue": "AgentUpdateIn (and AgentIn) still accept commission_percent and store it, but the value is ignored now that rates are tiered. Remove the field or reject it so an admin can't think a custom rate applies."},
+      {"endpoint": "POST /api/auth/otp/request, register", "issue": "The email provider returned 429 'email rate limit exceeded' after many test registrations, so the backend answered 503. This is an environment/test-volume limit, not a code bug."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin/agents (1920px)", "issues": ["The agents table is in a narrow max-width column, so the last action button ('Disable') is cut off and needs horizontal scrolling. Widen the content area or make the actions column compact."]}
+    ]
+  },
+  "verified": [
+    "Transfer UI: available $300; amount > balance disables the button; breakdown shows 5% fee $5 and net $95; the confirm dialog text is correct; a wrong receiving password shows the toast 'The password for the receiving account is incorrect'; a correct one shows the success toast TRF-xxx, the sender balance drops to $200 and a history row appears",
+    "The receiver logs in and sees $95, a 'From' history row and 'Transfer In' in the Statement. The sender's Statement shows 'Transfer Out' with the fee in the description",
+    "API: self email 400; amount > balance 400; admin/staff/agent targets 400; amount 0 or negative 422; 4 wrong passwords give 401 and the 5th gives 429, then even the right password gets 429 (locked); balances unchanged on errors",
+    "Fee set to 10% gives fee 10 / net 90 on the next transfer and public config shows 10; 51 is rejected with 422; restored to 5",
+    "GET /api/admin/transfers: owner 200, staff 200, player 403; a staff account calling POST /transfers gets 403",
+    "Tiers with a TEST agent: 1 player gives a 5% commission; adding 10 fake users (11 players) gives 7%; adding 40 more (51) gives 10%; /agent/me shows 10% and the tier text; the admin list's current_rate matches",
+    "Credit Config: settings-transfer-fee and settings-deposit-alerts-switch save and survive a reload (tested 10%/off, then restored to 5%/on)",
+    "/admin/agents: the create form has 3 inputs and no commission input, and shows the tier text; Rate column 5% for both agents; no Rate button; Pay (confirm + note prompt) sets unpaid to $0 and disables Pay; Disable shows SUSPENDED and the button changes to Enable, which reverts it. Staff sees no create form and no Pay buttons",
+    "Agent portal: the description shows the current rate of 5% and the tiers text",
+    "No login-to-admin-link on /login; no footer-admin-login-link and no 'Admin login' text on the landing page; logged-out /admin goes to /admin/login and the owner can sign in there and lands on /admin; the owner can also sign in via /login and lands on /admin",
+    "Regression: staff console, deposit approval queue and demo player overview load; agent and platform deposit/approve tests pass",
+    "Auth: admin hash starts with $2b$; only 1 admin; httpOnly cookies set on login"
+  ],
+  "test_report_links": ["/app/backend/tests/test_transfers_agent_tiers.py", "/app/backend/tests/test_agents_deposit_alerts.py", "/app/backend/tests/test_platform_api.py", "/app/test_reports/pytest/pytest_iter10.xml"],
+  "action_items": [
+    "Remove or reject commission_percent in AgentIn and AgentUpdateIn (it is ignored now)",
+    "Agents table layout: the actions column is cut off at desktop width",
+    "Update test_otp_auth.py::test_new_referral_code_sm: codes now start with 'SC', not 'SM'"
+  ],
+  "critical_code_review_comments": [
+    "create_transfer: the sender is debited and the receiver credited in two separate updates, not in a transaction. If the second update fails, the money is lost. Consider a Mongo transaction or a compensating step.",
+    "The wrong-password counter for transfers uses a find followed by a non-atomic set, so concurrent requests can exceed 5 attempts. Use $inc.",
+    "Tiers count every user with agent_id, including unverified players and players with no deposits. Agents could inflate their tier with throwaway sign-ups. Consider counting only verified players or players with a deposit.",
+    "Transfers don't require the sender's email to be verified, and they aren't recorded as fraud alerts. Consider velocity/high-amount alerts for transfers, since moving balance between accounts is a common abuse vector."
+  ],
+  "updated_files": ["/app/backend/tests/test_transfers_agent_tiers.py (new)", "/app/backend/tests/test_agents_deposit_alerts.py (outdated fixed 10% -> tiered 5% expectations)", "/app/backend/tests/test_platform_api.py (SETTINGS_KEYS now includes deposit_alerts, transfer_fee_percent)"],
+  "success_rate": {"backend": "100% of feature tests (7/7); 127/129 full suite (2 failures from outdated test / email rate limit)", "frontend": "100%"},
+  "flaky_tests": ["test_platform_api.py::TestProviders::test_wallet_flow failed once in a parallel run (121.5 vs 120), probably because a loss-reward run in test_loss_rewards credited the user at the same time; it passes when run alone"],
+  "seed_data_creation": "Only TEST_ data was created (test_tr_*, test_ui_*, test_uiag_*, test_tier_* users, plus TESTFAKE-* fake agent players) and it was deleted by id. Settings restored (transfer_fee 5, deposit_alerts true). No credentials changed. Note: there is an existing transfer TRF-B4626080 from demo to agentplayer1 ($100, made before this test run, probably by the main agent); demo's balance is now $1,039.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_transfers_agent_tiers.py covers transfers and tiers. The transfer lockout key is login_attempts identifier 'transfer:{user_id}'. Avoid mass registrations: the email provider rate-limits (429 -> 503)."
+}

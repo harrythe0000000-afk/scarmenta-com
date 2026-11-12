@@ -64,7 +64,7 @@ export default function AdminAgents() {
   return (
     <>
       <PageHeader eyebrow="Agents" title="Agent accounts & commission" desc="Agents bring players with their own sign-up link and earn commission on every approved deposit: 1–10 players 5%, 11–50 players 7%, 51+ players 10%." />
-      <div className={`grid gap-6 ${owner ? "lg:grid-cols-[340px_1fr]" : ""}`}>
+      <div className={`grid gap-6 ${owner ? "2xl:grid-cols-[320px_1fr]" : ""}`}>
         {owner && <NewAgent onDone={reload} />}
         {!data?.length ? <EmptyState text="No agents yet." testId="agents-empty" /> : (
           <div className="card-lux overflow-x-auto p-2" data-testid="agents-table">

@@ -117,7 +117,7 @@ class TestAgentsFlow:
         assert r.status_code == 200, r.text
         a = r.json()
         CREATED["agents"].append(a["id"])
-        assert a["agent_code"].startswith("AG") and a["role"] == "agent" and a["commission_percent"] == 10
+        assert a["agent_code"].startswith("AG") and a["role"] == "agent" and a["commission_percent"] is None  # tiered since iter10
         assert "password_hash" not in a and "_id" not in a
         self.state.update(agent=a, email=email)
         dup = owner.post(f"{API}/admin/agents", json={"name": "TEST Agent", "email": email.upper(), "password": "Test@12345",
@@ -150,30 +150,30 @@ class TestAgentsFlow:
         r = staff.post(f"{API}/admin/deposits/{dep['id']}/approve")
         assert r.status_code == 200
         rows = list(mdb.agent_commissions.find({"deposit_ref": dep["reference"]}))
-        assert len(rows) == 1 and rows[0]["amount"] == 15.0 and rows[0]["status"] == "unpaid"
+        assert len(rows) == 1 and rows[0]["amount"] == 7.5 and rows[0]["percent"] == 5.0 and rows[0]["status"] == "unpaid"
         again = owner.post(f"{API}/admin/deposits/{dep['id']}/approve")
         assert again.status_code == 409
         assert mdb.agent_commissions.count_documents({"deposit_ref": dep["reference"]}) == 1
         row = next(x for x in owner.get(f"{API}/admin/agents").json() if x["id"] == self.state["agent"]["id"])
-        assert row["players"] == 1 and row["volume"] == 150.0 and row["earned"] == 15.0 and row["unpaid"] == 15.0
+        assert row["players"] == 1 and row["volume"] == 150.0 and row["earned"] == 7.5 and row["unpaid"] == 7.5
 
     def test_update_rate(self, owner):
         aid = self.state["agent"]["id"]
-        r = owner.patch(f"{API}/admin/agents/{aid}", json={"commission_percent": 20})
-        assert r.status_code == 200 and r.json()["commission_percent"] == 20 and "password_hash" not in r.json()
+        r = owner.patch(f"{API}/admin/agents/{aid}", json={"status": "active"})
+        assert r.status_code == 200 and "password_hash" not in r.json()
         assert owner.patch(f"{API}/admin/agents/{aid}", json={}).status_code == 400
-        assert owner.patch(f"{API}/admin/agents/nonexistent", json={"commission_percent": 5}).status_code == 404
+        assert owner.patch(f"{API}/admin/agents/nonexistent", json={"status": "active"}).status_code == 404
 
     def test_payout(self, owner):
         aid = self.state["agent"]["id"]
         r = owner.post(f"{API}/admin/agents/{aid}/payout", json={"note": "TEST tx"})
-        assert r.status_code == 200 and r.json()["amount"] == 15.0 and r.json()["count"] == 1
+        assert r.status_code == 200 and r.json()["amount"] == 7.5 and r.json()["count"] == 1
         row = next(x for x in owner.get(f"{API}/admin/agents").json() if x["id"] == aid)
-        assert row["unpaid"] == 0 and row["paid"] == 15.0
+        assert row["unpaid"] == 0 and row["paid"] == 7.5
         assert owner.post(f"{API}/admin/agents/{aid}/payout", json={}).status_code == 400
         s = login(self.state["email"], "Test@12345")
         me = s.get(f"{API}/agent/me").json()
-        assert me["paid"] == 15.0 and len(me["payouts"]) == 1 and me["players_list"][0]["deposited"] == 150.0
+        assert me["paid"] == 7.5 and len(me["payouts"]) == 1 and me["players_list"][0]["deposited"] == 150.0
 
     def test_disabled_agent_no_commission(self, owner):
         aid = self.state["agent"]["id"]
