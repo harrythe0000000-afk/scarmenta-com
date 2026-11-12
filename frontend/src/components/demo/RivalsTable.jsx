@@ -35,7 +35,7 @@ export const RivalsTable = ({ free, onRound }) => {
   const place = (side) => {
     if (dealing) return;
     if (result) { setResult(null); setCards({ rivals: null, scarmenta: null }); }
-    if (chip > free - staked) return toast.error("Not enough demo balance — press Reset to get $1,000 again");
+    if (chip > free - staked) return toast.error("Not enough demo balance — press Reset to get $1,000 again", { position: "top-center" });
     play("chip");
     setBets((b) => ({ ...b, [side]: (b[side] || 0) + chip }));
   };

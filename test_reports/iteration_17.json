@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only test of /app/demo-game (desktop 1920 + mobile 390) as demo@aetheria.io. Verified: disclaimer, 3 tabs, $1,000 start balance; Rivals table (3 multi-side rounds, net + balance math exact for side wins, history dots, Clear bets, insufficient-balance toast, Reset to $1,000); Andar Bahar (4 rounds, joker shown, alternating Andar-first deal, winner computed correctly, Andar win net = 1.9x stake, Bahar loss/win math correct, bet spots disabled while dealing, winner bet spot highlighted); 'Ready for real play?' dialog appears exactly once after 5th round across both tables (and with 5 Rivals rounds on mobile), Keep practicing closes it, Go to Deposits navigates to /app/deposits; sound toggle flips aria/icon and persists localStorage scarmenta_demo_sound off/on across reload; no Web Audio console errors / page errors; tutorial shows 2 guides x 3 steps; real wallet balance unchanged (1039.0 before & after); mobile has no horizontal overflow. Found 1 logic bug (wrong winning card highlighted in Andar Bahar) and 1 mobile layout issue (latest AB cards clipped). Tie payout path not hit randomly; verified by code review only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AndarBaharTable deal()", "issue": "The green ring that marks the winning card goes on the wrong card. It lands on the second-to-last card dealt, which sits on the losing side, not on the card that matched the Joker. Seen in every round: Joker 8, winner 8♠ on Andar, but the ring was on 10♣ on Bahar. Joker J, winner J♥, ring on 5♣. Root cause: `setDealt((d) => [...d, { ...c, hit: i === round.seq.length - 1 }])` reads `i` inside the updater function. React 18 runs that function later, after `i += 1` has already happened. Fix: work out `const isHit = i === round.seq.length - 1` before calling setDealt, or use the index of the card in the seq.", "selector": "[data-testid=demo-ab-andar-row] / [data-testid=demo-ab-bahar-row] .ring-4", "priority": "HIGH"},
+      {"component": "AndarBaharTable Row (mobile 390px)", "issue": "Each row shows the last 8 cards (`cards.slice(-8)`) in an overflow-hidden flex box. At 390px only about 4.5 cards fit, so the newest cards, including the winning card, are cut off on the right and can't be seen. Fix: show fewer cards on small screens, use overflow-x-auto, or reverse the order so the newest card is on the left.", "selector": "[data-testid=demo-ab-andar-row]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Demo game toasts", "issues": ["The 'Not enough demo balance' toast sits on top of the bottom-right chat widget button."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix the Andar Bahar winning-card ring: compute the hit flag before setDealt instead of reading the mutable `i` inside the updater.",
+    "Make the Andar Bahar rows show the newest/winning card on mobile (390px)."
+  ],
+  "critical_code_review_comments": [
+    "DemoGame Reset doesn't clear bets that are already placed. If the balance is above $1,000 and more than $1,000 is staked, pressing Reset can let the balance go negative on a loss. Pressing Reset during a deal also sets the balance to $1,000 and then the round's net is added on top. Consider disabling Reset while dealing, or clearing bets on Reset.",
+    "Radix TabsContent unmounts the inactive tab. Switching tabs during an Andar Bahar deal clears the interval, so the round never settles and never counts toward the 5-round prompt. Rivals keeps its setTimeout running and calls onRound after unmount. Harmless for a demo, but the two tables behave differently. Consider forceMount, or disabling the tabs while dealing.",
+    "DemoGame onRound calls setPrompt inside the setRounds updater. That is a side effect inside an updater, which StrictMode runs twice. It works because the call is idempotent, but it's better to check the count in a useEffect."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "92%"},
+  "seed_data_creation": "None. Demo play is client-side only; real wallet unchanged.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login testids: login-email-input, login-password-input, login-submit-button; press Escape after login (popup). Andar Bahar deals take up to ~17s; wait for [data-testid=demo-result-net]. To check the highlight fix: the card with the .ring-4 class inside the AB rows must have the same rank as [data-testid=demo-ab-joker] and sit in the winner's row. Real wallet for demo user was 1039.0."
+}

@@ -98,3 +98,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## 2026-11-12 Demo card game + BULKAPI status
 - /app/demo-game: frontend-only practice table "Scarmenta vs Rivals" (Stake/1win/4rabet text badges), higher card wins, same rank = Tie (8:1, side bets half back), fair crypto random, demo $1,000 balance reset on page open + Reset button; no backend, no real balance
 - BULKAPI: paused by user. Report at memory/BULKAPI_REPORT.md. Secrets BULKAPI_API_TOKEN/SECRET_KEY/UNIQUE_CODE saved; no docs + shared callback with Lara.in blocks integration
+
+## 2026-11-12 Demo games v2
+- Demo page now tabs: Scarmenta vs Rivals, Andar Bahar (Andar 0.9:1, Bahar 1:1, joker + alternate deal, Andar first), Tutorial (2x 3-step guides)
+- Web Audio synthesized sounds (flip/chip/win/lose), on by default, mute persisted (scarmenta_demo_sound)
+- "Ready for real play?" dialog after 5 total rounds -> /app/deposits
+- Shared demo balance $1,000 per page open + Reset. Tests: iteration_17.json (bugs fixed: AB winning-card highlight, mobile row order, toast position)

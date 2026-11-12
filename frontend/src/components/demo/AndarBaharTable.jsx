@@ -42,7 +42,7 @@ const MiniCard = ({ c, hit }) => (
 const Row = ({ label, cards, total, testId, tone }) => (
   <div className="flex items-center gap-3" data-testid={testId}>
     <span className={`w-16 shrink-0 text-xs font-bold uppercase tracking-wider ${tone}`}>{label}</span>
-    <div className="flex min-h-12 flex-1 gap-1 overflow-hidden">{cards.slice(-8).map((c, i, arr) => <MiniCard key={`${c.rank}${c.suit}`} c={c} hit={c.hit && i === arr.length - 1} />)}</div>
+    <div className="flex min-h-12 flex-1 flex-row-reverse justify-end gap-1 overflow-hidden p-1">{cards.slice(-8).map((c) => <MiniCard key={`${c.rank}${c.suit}`} c={c} hit={c.hit} />)}</div>
     <span className="w-8 text-right font-num text-xs text-slate-500">{total}</span>
   </div>
 );
@@ -61,7 +61,7 @@ export const AndarBaharTable = ({ free, onRound }) => {
   const place = (side) => {
     if (dealing) return;
     if (result) { setResult(null); setJoker(null); setDealt([]); }
-    if (chip > free - staked) return toast.error("Not enough demo balance — press Reset to get $1,000 again");
+    if (chip > free - staked) return toast.error("Not enough demo balance — press Reset to get $1,000 again", { position: "top-center" });
     play("chip");
     setBets((b) => ({ ...b, [side]: (b[side] || 0) + chip }));
   };
@@ -75,9 +75,9 @@ export const AndarBaharTable = ({ free, onRound }) => {
     play("flip");
     let i = 0;
     timer.current = setInterval(() => {
-      const c = round.seq[i];
+      const c = { ...round.seq[i], hit: i === round.seq.length - 1 };
       play("flip");
-      setDealt((d) => [...d, { ...c, hit: i === round.seq.length - 1 }]);
+      setDealt((d) => [...d, c]);
       i += 1;
       if (i >= round.seq.length) {
         clearInterval(timer.current);
