@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
+import { homeFor, isTeam } from "@/lib/roles";
 
 const AuthLayout = ({ title, subtitle, children, footer }) => (
   <div className="relative grid min-h-screen bg-[#05040A] lg:grid-cols-2">
@@ -60,14 +61,14 @@ export const AdminLogin = () => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  if (user && user.role !== "user") return <Navigate to="/admin" replace />;
+  if (user && isTeam(user.role)) return <Navigate to="/admin" replace />;
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
       const u = await login(form.email, form.password);
-      if (u.role === "user") {
+      if (!isTeam(u.role)) {
         await logout();
         setError("This account doesn't have admin access. Players sign in from the main login page.");
       } else navigate("/admin");
@@ -136,7 +137,7 @@ const OtpLogin = () => {
     try {
       const { data } = await api.post("/auth/otp/verify", { email, code });
       setUser(data);
-      navigate(data.role === "user" ? "/app" : "/admin");
+      navigate(homeFor(data.role));
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -176,7 +177,7 @@ const PasswordLogin = () => {
     setError("");
     try {
       const u = await login(form.email, form.password);
-      navigate(u.role === "user" ? "/app" : "/admin");
+      navigate(homeFor(u.role));
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -200,7 +201,7 @@ export const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [form, setForm] = useState({ name: "", email: "", password: "", country: "", referral_code: params.get("ref") || "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", country: "", referral_code: params.get("ref") || "", agent_code: params.get("agent") || "" });
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -210,7 +211,7 @@ export const Register = () => {
     setBusy(true);
     setError("");
     try {
-      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null });
+      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null });
       toast.success(u.verification_sent ? "Account created — check your inbox to verify your email." : "Account created. Use 'Resend email' to get your verification link.");
       navigate("/app");
     } catch (err) {
@@ -229,6 +230,7 @@ export const Register = () => {
         <Field id="password" label="Password (min 8 chars)" type="password" minLength={8} required value={form.password} data-testid="register-password-input" onChange={set("password")} />
         <Field id="country" label="Country (optional)" value={form.country} data-testid="register-country-input" onChange={set("country")} />
         <Field id="referral" label="Referral code (optional)" value={form.referral_code} data-testid="register-referral-input" onChange={set("referral_code")} />
+        {form.agent_code && <p className="text-xs text-slate-400" data-testid="register-agent-code">Joining with agent code <span className="font-num text-[#F2B94B]">{form.agent_code}</span></p>}
         <label className="flex items-start gap-3 text-xs text-slate-400">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} data-testid="register-agree-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500" />
           I confirm I am 18+ and located in a jurisdiction where these services are legally authorized.
@@ -325,7 +327,7 @@ export const VerifyEmail = () => {
         {state === "error" && (<><XCircle className="mx-auto h-10 w-10 text-red-400" /><p className="mt-3 text-red-200">{error}</p></>)}
         {state !== "loading" && (
           <Button asChild className="mt-6 rounded-full bg-purple-600 hover:bg-purple-500" data-testid="verify-continue-button">
-            <Link to={user ? (user.role === "user" ? "/app" : "/admin") : "/login"}>Continue</Link>
+            <Link to={user ? homeFor(user.role) : "/login"}>Continue</Link>
           </Button>
         )}
       </div>

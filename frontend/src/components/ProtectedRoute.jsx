@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor, isTeam } from "@/lib/roles";
 
 export const FullLoader = () => (
   <div className="min-h-screen grid place-items-center bg-[#05040A]" data-testid="page-loader">
@@ -10,9 +11,9 @@ export const FullLoader = () => (
 export default function ProtectedRoute({ role, children }) {
   const { user } = useAuth();
   if (user === null) return <FullLoader />;
-  if (!user) return <Navigate to={role === "user" ? "/login" : "/admin/login"} replace />;
-  if (role === "admin" && user.role === "user") return <Navigate to="/app" replace />;
-  if (role === "owner" && user.role !== "admin") return <Navigate to="/admin" replace />;
-  if (role === "user" && user.role !== "user") return <Navigate to="/admin" replace />;
+  if (!user) return <Navigate to={role === "admin" || role === "owner" ? "/admin/login" : "/login"} replace />;
+  if (role === "admin" && !isTeam(user.role)) return <Navigate to={homeFor(user.role)} replace />;
+  if (role === "owner" && user.role !== "admin") return <Navigate to={homeFor(user.role)} replace />;
+  if ((role === "user" || role === "agent") && user.role !== role) return <Navigate to={homeFor(user.role)} replace />;
   return children;
 }

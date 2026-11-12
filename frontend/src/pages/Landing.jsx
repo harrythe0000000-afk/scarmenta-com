@@ -5,6 +5,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { CreditCalculator } from "@/components/CreditCalculator";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { homeFor } from "@/lib/roles";
 import { useConfig } from "@/lib/hooks";
 import { calc, usd } from "@/lib/format";
 
@@ -12,7 +13,7 @@ const HERO_IMG = "https://images.unsplash.com/photo-1689443111130-6e9c7dfd8f9e?c
 
 const NavBar = () => {
   const { user } = useAuth();
-  const dash = user ? (user.role === "user" ? "/app" : "/admin") : null;
+  const dash = user ? homeFor(user.role) : null;
   return (
     <header className="sticky top-0 z-40 border-b border-purple-500/10 glass">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">

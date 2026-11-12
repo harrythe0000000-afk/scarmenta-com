@@ -164,3 +164,13 @@ async def send_otp_email(user: dict, code: str) -> None:
         '</table></td></tr></table>'
     )
     await send_email(to=user["email"], subject=f"{code} is your {EMAIL_FROM_NAME} sign-in code", html=html)
+
+
+async def send_deposit_alert(to_name: str, to_email: str, dep: dict, base_url: str) -> None:
+    via = f"USDT {dep.get('network') or ''}".strip() if dep["method"] == "usdt" else "UPI"
+    intro = (f"A new deposit is waiting for approval.<br><br><b>{escape(dep['reference'])}</b> · "
+             f"{escape(dep['user_name'])} ({escape(dep['user_email'])})<br>"
+             f"Amount: <b>${dep['amount']:,.2f}</b> via {escape(via)}<br>Payment reference: {escape(dep['payment_reference'])}")
+    html = _template(to_name, intro, "Review deposit", f"{base_url}/admin/deposits",
+                     "Check the payment has arrived before you approve it.")
+    await send_email(to=to_email, subject=f"New deposit {dep['reference']} · ${dep['amount']:,.2f} waiting for approval", html=html)

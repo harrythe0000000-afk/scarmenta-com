@@ -2,10 +2,11 @@ from core import (db, client, now, now_iso, new_id, clean, hash_password, verify
                   set_access_cookie, clear_auth_cookies, decode_token, get_current_user, require_admin, require_staff,
                   get_settings, compute_breakdown, client_ip, DEFAULT_SETTINGS, SITE_ORIGINS, site_url, make_tx,
                   unique_referral_code)
-from emailer import send_verification_email, send_reset_email, send_otp_email
+from emailer import send_verification_email, send_reset_email, send_otp_email, send_deposit_alert
 import games
 import referrals
 import rewards
+import agents
 
 import asyncio
 import logging
@@ -29,7 +30,9 @@ INDEXES: dict[str, list[IndexModel]] = {
     "users": [IndexModel([("email", ASCENDING)], name="email", unique=True),
               IndexModel([("id", ASCENDING)], name="id", unique=True),
               IndexModel([("referral_code", ASCENDING)], name="referral_code", unique=True, sparse=True),
-              IndexModel([("referred_by", ASCENDING)], name="referred_by")],
+              IndexModel([("referred_by", ASCENDING)], name="referred_by"),
+              IndexModel([("agent_code", ASCENDING)], name="agent_code", unique=True, sparse=True),
+              IndexModel([("agent_id", ASCENDING)], name="agent_id")],
     "deposits": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                  IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
                  IndexModel([("status", ASCENDING), ("created_at", DESCENDING)], name="status_created")],
@@ -38,6 +41,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "tickets": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                 IndexModel([("user_id", ASCENDING), ("updated_at", DESCENDING)], name="user_updated")],
     "fraud_alerts": [IndexModel([("status", ASCENDING), ("created_at", DESCENDING)], name="status_created")],
+    "agent_commissions": [IndexModel([("agent_id", ASCENDING), ("created_at", DESCENDING)], name="agent_created")],
     "providers": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                   IndexModel([("code", ASCENDING)], name="code", unique=True),
                   IndexModel([("api_key_hash", ASCENDING)], name="api_key_hash")],
@@ -78,6 +82,7 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     country: Optional[str] = Field(default=None, max_length=60)
     referral_code: Optional[str] = Field(default=None, max_length=20)
+    agent_code: Optional[str] = Field(default=None, max_length=20)
 
 
 class LoginIn(BaseModel):
@@ -158,6 +163,7 @@ class SettingsIn(BaseModel):
     fraud_velocity_count: int = Field(ge=1, le=50)
     referral_bonus_percent: float = Field(ge=0, le=100)
     loss_reward_percent: float = Field(ge=0, le=100)
+    deposit_alerts: bool
     packages: List[float] = Field(min_length=1, max_length=8)
     fx_rates: Dict[str, float]
     upi_id: str = Field(max_length=100)
@@ -222,11 +228,18 @@ async def register(body: RegisterIn, request: Request, response: Response):
                                            {"_id": 0, "id": 1, "email": 1})
         if not referrer:
             raise HTTPException(status_code=400, detail="Invalid referral code")
+    agent = None
+    if body.agent_code and body.agent_code.strip():
+        agent = await db.users.find_one({"agent_code": body.agent_code.strip().upper(), "role": "agent", "status": "active"},
+                                        {"_id": 0, "id": 1})
+        if not agent:
+            raise HTTPException(status_code=400, detail="Invalid agent code")
     user = {"id": new_id(), "email": email, "name": body.name.strip(), "country": body.country,
             "password_hash": hash_password(body.password), "role": "user", "status": "active",
             "email_verified": False, "promo_balance": 0.0, "referral_code": await unique_referral_code(),
             "referred_by": referrer["id"] if referrer else None,
-            "referred_by_email": referrer["email"] if referrer else None, "created_at": now_iso()}
+            "referred_by_email": referrer["email"] if referrer else None,
+            "agent_id": agent["id"] if agent else None, "created_at": now_iso()}
     await db.users.insert_one(user)
     sent = await send_verification(user, site_url(request))
     set_auth_cookies(response, user)
@@ -434,8 +447,17 @@ async def wallet(user: dict = Depends(get_current_user)):
             "referral_earnings": user.get("referral_earnings", 0), "loss_rewards": user.get("loss_rewards_total", 0)}
 
 
+async def notify_staff(dep: dict, base_url: str) -> None:
+    team = await db.users.find({"role": {"$in": ["admin", "staff"]}, "status": "active"}, {"_id": 0, "name": 1, "email": 1}).to_list(100)
+    for m in team:
+        try:
+            await send_deposit_alert(m["name"], m["email"], dep, base_url)
+        except Exception as exc:
+            logger.error("deposit alert to %s failed: %s", m["email"], exc)
+
+
 @api.post("/deposits")
-async def create_deposit(body: DepositIn, user: dict = Depends(get_current_user)):
+async def create_deposit(body: DepositIn, request: Request, user: dict = Depends(get_current_user)):
     if user.get("role") != "user":
         raise HTTPException(status_code=403, detail="Only player accounts can deposit")
     if not user.get("email_verified"):
@@ -478,6 +500,8 @@ async def create_deposit(body: DepositIn, user: dict = Depends(get_current_user)
         await add_alert("high_amount", "high", f"Deposit {dep['reference']} of ${body.amount:,.2f} exceeds threshold", user, dep["reference"])
     if "velocity" in flags:
         await add_alert("velocity", "medium", f"{recent + 1} deposits in 24h by {user['email']}", user, dep["reference"])
+    if s.get("deposit_alerts", True):
+        asyncio.create_task(notify_staff(dict(dep), site_url(request)))
     return clean(dep)
 
 
@@ -624,6 +648,7 @@ async def admin_approve(dep_id: str, admin: dict = Depends(require_staff)):
         raise HTTPException(status_code=409, detail="Deposit not found or already reviewed")
     await credit_deposit(dep)
     await referrals.reward_referrer(dep)
+    await agents.reward_agent(dep)
     return dep
 
 
@@ -775,6 +800,7 @@ app.include_router(api)
 app.include_router(referrals.router)
 app.include_router(games.router)
 app.include_router(rewards.router)
+app.include_router(agents.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 

@@ -4,6 +4,7 @@ import { Plus, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/StatCard";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
@@ -132,6 +133,10 @@ export default function AdminSettings() {
           <NumField label="Referral income (% of every friend's deposit)" value={s.referral_bonus_percent} onChange={set("referral_bonus_percent")} testId="settings-referral-bonus" />
           <NumField label="Weekly loss reward (% of a player's net loss)" value={s.loss_reward_percent} onChange={set("loss_reward_percent")} testId="settings-loss-reward" />
           <p className="text-xs text-slate-500">Set either to 0 to switch it off.</p>
+          <label className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300">
+            Email owner & staff when a new deposit is waiting
+            <Switch data-testid="settings-deposit-alerts-switch" checked={!!s.deposit_alerts} onCheckedChange={(v) => setS({ ...s, deposit_alerts: v })} />
+          </label>
         </div>
         <div className="card-lux space-y-4 p-6">
           <p className="label-eyebrow">Where players pay you</p>

@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -28,6 +28,8 @@ import AdminLossRewards from "@/pages/admin/LossRewards";
 import AdminMoneyFlow from "@/pages/admin/MoneyFlow";
 import AccountSettings from "@/pages/AccountSettings";
 import AdminStaff from "@/pages/admin/Staff";
+import AdminAgents from "@/pages/admin/Agents";
+import AgentDashboard from "@/pages/agent/Dashboard";
 
 const USER_NAV = [
   { id: "user-overview", to: "/app", end: true, label: "Overview", icon: LayoutDashboard },
@@ -38,6 +40,11 @@ const USER_NAV = [
   { id: "user-statement", to: "/app/statement", label: "Statement", icon: ScrollText },
   { id: "user-support", to: "/app/support", label: "Support", icon: LifeBuoy },
   { id: "user-account", to: "/app/account", label: "My Account", icon: UserCog },
+];
+
+const AGENT_NAV = [
+  { id: "agent-dashboard", to: "/agent", end: true, label: "Dashboard", icon: Handshake },
+  { id: "agent-account", to: "/agent/account", label: "My Account", icon: UserCog },
 ];
 
 const ADMIN_NAV = [
@@ -52,6 +59,7 @@ const ADMIN_NAV = [
   { id: "admin-loss-rewards", to: "/admin/loss-rewards", label: "Loss Rewards", icon: Award, adminOnly: true },
   { id: "admin-fraud", to: "/admin/fraud", label: "Fraud Monitor", icon: ShieldAlert },
   { id: "admin-support", to: "/admin/support", label: "Support", icon: LifeBuoy },
+  { id: "admin-agents", to: "/admin/agents", label: "Agents", icon: Handshake },
   { id: "admin-staff", to: "/admin/staff", label: "Staff", icon: ShieldCheck, adminOnly: true },
   { id: "admin-account", to: "/admin/account", label: "My Account", icon: UserCog },
   { id: "admin-settings", to: "/admin/settings", label: "Credit Config", icon: Settings2, adminOnly: true },
@@ -94,6 +102,11 @@ function App() {
             <Route path="support" element={<AdminSupport />} />
             <Route path="settings" element={<ProtectedRoute role="owner"><AdminSettings /></ProtectedRoute>} />
             <Route path="staff" element={<ProtectedRoute role="owner"><AdminStaff /></ProtectedRoute>} />
+            <Route path="agents" element={<AdminAgents />} />
+          </Route>
+          <Route path="/agent" element={<ProtectedRoute role="agent"><DashboardShell nav={AGENT_NAV} area="Agent Portal" /></ProtectedRoute>}>
+            <Route index element={<AgentDashboard />} />
+            <Route path="account" element={<AccountSettings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

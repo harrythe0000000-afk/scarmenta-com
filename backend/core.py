@@ -33,6 +33,7 @@ DEFAULT_SETTINGS = {
     "fraud_velocity_count": 3,
     "referral_bonus_percent": 10.0,
     "loss_reward_percent": 5.0,
+    "deposit_alerts": True,
     "packages": [50.0, 100.0, 250.0, 500.0, 1000.0],
     "fx_rates": {"INR": 95.0, "AED": 3.67, "PKR": 280.0, "BDT": 120.0, "NPR": 152.0, "LKR": 300.0,
                  "SAR": 3.75, "QAR": 3.64, "KWD": 0.31, "OMR": 0.385, "BHD": 0.376},
