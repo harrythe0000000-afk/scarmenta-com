@@ -1,6 +1,3 @@
-import { useState } from "react";
-
-const LANG_KEY = "scarmenta_tutorial_lang";
 
 const GUIDES = {
   en: [
@@ -14,6 +11,11 @@ const GUIDES = {
       ["Bet Andar or Bahar", "Andar pays 0.9:1 and Bahar pays 1:1, like in real casinos."],
       ["Watch the deal", "A Joker opens, then cards fall Andar, Bahar, Andar… The first side to get the Joker's number wins."],
     ] },
+    { title: "Teen Patti", steps: [
+      ["Pick a chip", "Choose your chip amount."],
+      ["Bet Rivals or Scarmenta", "Each side gets 3 cards from the dealer. Both sides pay 1:1; on a Tie all bets come back."],
+      ["Know the hands", "Best to lowest: Trail (3 same) > Pure sequence > Sequence > Color (same suit) > Pair > High card."],
+    ] },
   ],
   hi: [
     { title: "Scarmenta vs Rivals", steps: [
@@ -26,33 +28,22 @@ const GUIDES = {
       ["Andar ya Bahar par bet", "Andar 0.9:1 deta hai aur Bahar 1:1, bilkul asli casino jaisa."],
       ["Deal dekhiye", "Pehle Joker card khulta hai, phir cards Andar, Bahar, Andar… girte hain. Jis side pehle Joker wala number aaye, wo jeetti hai."],
     ] },
+    { title: "Teen Patti", steps: [
+      ["Chip chuniye", "Apni chip amount chuniye."],
+      ["Rivals ya Scarmenta par bet", "Dealer dono side ko 3-3 card deta hai. Dono side 1:1 deti hain; Tie par saari bet wapas."],
+      ["Haath pehchaniye", "Sabse bada se chhota: Trail (teeno same) > Pure sequence > Sequence > Color (same suit) > Pair > High card."],
+    ] },
   ],
 };
 
 const NOTE = {
-  en: "Both tables use free demo credits only. Nothing is taken from or added to your real balance, and results are fully random.",
-  hi: "Dono tables sirf free demo credits se chalti hain. Aapke asli balance se na kuch katta hai na judta hai, aur result poori tarah random hai.",
+  en: "All tables use free demo credits only. Nothing is taken from or added to your real balance, and results are fully random.",
+  hi: "Saari tables sirf free demo credits se chalti hain. Aapke asli balance se na kuch katta hai na judta hai, aur result poori tarah random hai.",
 };
 
-const LangToggle = ({ lang, setLang }) => (
-  <div className="flex gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid="tutorial-lang-toggle">
-    {[["en", "English"], ["hi", "Hinglish"]].map(([v, l]) => (
-      <button key={v} type="button" onClick={() => setLang(v)} data-testid={`tutorial-lang-${v}`}
-        className={`rounded-full px-4 py-1 text-xs font-medium transition-colors ${lang === v ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"}`}>{l}</button>
-    ))}
-  </div>
-);
-
-export const DemoTutorial = () => {
-  const [lang, setLangState] = useState(() => localStorage.getItem(LANG_KEY) || "en");
-  const setLang = (v) => {
-    localStorage.setItem(LANG_KEY, v);
-    setLangState(v);
-  };
-  return (
+export const DemoTutorial = ({ lang }) => (
     <div className="space-y-6" data-testid="demo-tutorial">
-      <div className="flex justify-end"><LangToggle lang={lang} setLang={setLang} /></div>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         {GUIDES[lang].map((g, gi) => (
           <div key={g.title} className="card-lux p-6" data-testid={`demo-tutorial-${gi}`}>
             <p className="label-eyebrow">Tutorial</p>
@@ -70,5 +61,4 @@ export const DemoTutorial = () => {
       </div>
       <p className="text-xs text-slate-500">{NOTE[lang]}</p>
     </div>
-  );
-};
+);

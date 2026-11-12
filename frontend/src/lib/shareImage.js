@@ -107,3 +107,71 @@ export async function renderShareImage({ amount, rate, days, final, chart, code,
   wrap(ctx, "Math example only. Scarmenta does not promise or guarantee any daily return, profit or winnings. Credits cannot be withdrawn.", 80, 1255, W - 160, 32);
   return new Promise((res) => c.toBlob(res, "image/png"));
 }
+
+export const downloadBlob = (blob, name) => {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+export async function shareBlob(blob, name, text) {
+  const file = new File([blob], name, { type: "image/png" });
+  if (navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], text });
+    return "shared";
+  }
+  downloadBlob(blob, name);
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  return "downloaded";
+}
+
+export async function renderStreakImage({ streak, game, code, link }) {
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#07050d";
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W / 2, 520, 40, W / 2, 520, 700);
+  glow.addColorStop(0, "rgba(249,115,22,0.55)");
+  glow.addColorStop(1, "rgba(249,115,22,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const logo = await loadImg("/scarmenta-logo.png");
+  if (logo) ctx.drawImage(logo, 80, 70, 90, 90);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 52px Georgia, serif";
+  ctx.fillText("Scarmenta", 190, 135);
+  ctx.textAlign = "center";
+  ctx.font = "260px serif";
+  ctx.fillText("🔥", W / 2, 560);
+  ctx.fillStyle = "#fbbf24";
+  ctx.font = "800 110px sans-serif";
+  ctx.fillText("HOT STREAK", W / 2, 720);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 64px sans-serif";
+  ctx.fillText(`${streak} wins in a row`, W / 2, 810);
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "500 36px sans-serif";
+  ctx.fillText(game, W / 2, 870);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(249,115,22,0.12)";
+  ctx.strokeStyle = "rgba(249,115,22,0.5)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(80, 990, W - 160, 210, 28);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "500 30px sans-serif";
+  ctx.fillText("Join with my referral code", 120, 1060);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 60px monospace";
+  ctx.fillText(code || "—", 120, 1120);
+  ctx.fillStyle = "#fdba74";
+  ctx.font = "500 24px sans-serif";
+  const shown = link.replace(/^https?:\/\//, "");
+  ctx.fillText(shown.length > 70 ? `…${shown.slice(-67)}` : shown, 120, 1170);
+  return new Promise((res) => c.toBlob(res, "image/png"));
+}

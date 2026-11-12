@@ -30,3 +30,18 @@ export const ResultText = ({ result, label }) => (
     )}
   </div>
 );
+
+export const LangToggle = ({ lang, setLang, testId }) => (
+  <div className="flex gap-1 rounded-full border border-purple-500/20 bg-black/40 p-1" data-testid={testId}>
+    {[["en", "English"], ["hi", "Hinglish"]].map(([v, l]) => (
+      <button key={v} type="button" onClick={() => setLang(v)} data-testid={`${testId}-${v}`}
+        className={`rounded-full px-4 py-1 text-xs font-medium transition-colors ${lang === v ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"}`}>{l}</button>
+    ))}
+  </div>
+);
+
+export const RivalBadges = () => (
+  <div className="flex flex-wrap justify-center gap-1.5">
+    {["Stake", "1win", "4rabet"].map((r) => <span key={r} className="rounded-md border border-sky-300/30 bg-sky-950/60 px-2 py-0.5 text-xs font-bold tracking-wide text-sky-100">{r}</span>)}
+  </div>
+);

@@ -3,16 +3,9 @@ import { toast } from "sonner";
 import { Download, Loader2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { renderShareImage } from "@/lib/shareImage";
+import { downloadBlob, renderShareImage, shareBlob } from "@/lib/shareImage";
 
 const FILE = "scarmenta-calculator.png";
-
-const download = (blob) => {
-  const url = URL.createObjectURL(blob);
-  const a = Object.assign(document.createElement("a"), { href: url, download: FILE });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
 
 export const ShareResult = ({ amount, rate, days, res }) => {
   const { user } = useAuth();
@@ -33,14 +26,10 @@ export const ShareResult = ({ amount, rate, days, res }) => {
     }
   };
   const share = run("share", async (blob) => {
-    const file = new File([blob], FILE, { type: "image/png" });
-    if (navigator.canShare?.({ files: [file] })) return navigator.share({ files: [file], text });
-    download(blob);
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-    toast.success("Image saved — attach it in WhatsApp");
+    if ((await shareBlob(blob, FILE, text)) === "downloaded") toast.success("Image saved — attach it in WhatsApp");
   });
   const save = run("save", async (blob) => {
-    download(blob);
+    downloadBlob(blob, FILE);
     toast.success("Image saved");
   });
 
