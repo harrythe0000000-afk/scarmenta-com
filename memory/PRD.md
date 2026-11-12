@@ -104,3 +104,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Web Audio synthesized sounds (flip/chip/win/lose), on by default, mute persisted (scarmenta_demo_sound)
 - "Ready for real play?" dialog after 5 total rounds -> /app/deposits
 - Shared demo balance $1,000 per page open + Reset. Tests: iteration_17.json (bugs fixed: AB winning-card highlight, mobile row order, toast position)
+
+## 2026-11-12 Tutorial language + win streak
+- Tutorial EN/Hinglish toggle (localStorage scarmenta_tutorial_lang)
+- Win streak counter (net>0 rounds in a row, both tables) + best; "Hot Streak" badge + toast at 3

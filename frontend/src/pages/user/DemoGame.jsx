@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/StatCard";
 import { RivalsTable } from "@/components/demo/RivalsTable";
 import { AndarBaharTable } from "@/components/demo/AndarBaharTable";
 import { DemoTutorial } from "@/components/demo/DemoTutorial";
+import { STREAK_GOAL, StreakMeter } from "@/components/demo/StreakMeter";
+import { toast } from "sonner";
 import { setSoundOn, soundOn } from "@/lib/sounds";
 import { usd } from "@/lib/format";
 
@@ -37,8 +39,14 @@ export default function DemoGame() {
   const [rounds, setRounds] = useState(0);
   const [prompt, setPrompt] = useState(false);
   const [sound, setSound] = useState(soundOn);
+  const [streak, setStreak] = useState(0);
+  const [best, setBest] = useState(0);
   const onRound = (net) => {
     setBalance((b) => Math.round((b + net) * 100) / 100);
+    const next = net > 0 ? streak + 1 : 0;
+    setStreak(next);
+    setBest((b) => Math.max(b, next));
+    if (next === STREAK_GOAL) toast.success("Hot Streak! 3 wins in a row", { position: "top-center" });
     setRounds((r) => {
       if (r + 1 === PROMPT_AFTER) setPrompt(true);
       return r + 1;
@@ -63,7 +71,8 @@ export default function DemoGame() {
             <TabsTrigger value="andar-bahar" data-testid="demo-tab-andar-bahar">Andar Bahar</TabsTrigger>
             <TabsTrigger value="tutorial" data-testid="demo-tab-tutorial">Tutorial</TabsTrigger>
           </TabsList>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <StreakMeter streak={streak} best={best} />
             <div className="text-right">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Demo balance</p>
               <p className="font-num text-2xl font-bold text-white" data-testid="demo-balance">{usd(balance)}</p>
