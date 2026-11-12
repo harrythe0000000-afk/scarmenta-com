@@ -66,7 +66,7 @@ export const TERMS = [
   { h: "11. Data Protection & Privacy", p: [
     "User information will be collected, processed and stored in accordance with the applicable Privacy Policy and data protection laws.",
     "Users should review the Privacy Policy before registering.",
-  ] },
+  ], privacyLink: true },
   { h: "12. Service Availability", p: [
     "Scarmenta aims to maintain reliable platform access but does not guarantee uninterrupted availability.",
     "Maintenance, technical failures, third-party outages and circumstances beyond reasonable control may affect service availability.",
@@ -93,5 +93,5 @@ export const TERMS = [
     "I have reviewed the refund and cancellation policy.",
     "I understand that no winnings or profits are guaranteed.",
     "I agree to the applicable Privacy Policy.",
-  ] },
+  ], privacyLink: true },
 ];

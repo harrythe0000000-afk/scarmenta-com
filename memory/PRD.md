@@ -56,3 +56,7 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Public /terms page; content frontend/src/lib/terms.js me (effective 12 Nov 2026, support@scarmenta.com)
 - Section 4 transfer line updated: transfers allowed only via official Transfer feature with 5% fee
 - Backend /api/auth/register rejects accepted_terms=false; stores terms_accepted_at + terms_version on user
+
+## 2026-11-12 Privacy Policy page
+- Public /privacy page (content in frontend/src/lib/privacy.js) — PLACEHOLDER text until user sends real policy
+- Linked from signup Terms checkbox, Terms sections 11 & 16, and /privacy links back to /terms

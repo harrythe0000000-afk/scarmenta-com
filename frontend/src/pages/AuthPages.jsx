@@ -74,7 +74,9 @@ const TermsAccept = ({ scrolled, onScrolled, checked, onChange }) => {
       <label className={`flex items-start gap-3 text-xs ${scrolled ? "text-slate-300" : "text-slate-600"}`}>
         <input type="checkbox" disabled={!scrolled} checked={checked} onChange={(e) => onChange(e.target.checked)}
           data-testid="register-terms-checkbox" className="mt-0.5 h-4 w-4 accent-purple-500 disabled:cursor-not-allowed" />
-        I have read and agree to the Scarmenta Terms & Conditions, including the credit usage, non-withdrawal and refund policies, and understand no winnings or profits are guaranteed.
+        <span>I have read and agree to the Scarmenta Terms & Conditions and the{" "}
+          <Link to="/privacy" target="_blank" className="text-purple-300 underline hover:text-purple-200" data-testid="register-privacy-link">Privacy Policy</Link>,
+          including the credit usage, non-withdrawal and refund policies, and understand no winnings or profits are guaranteed.</span>
       </label>
     </div>
   );

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Terms from "@/pages/Terms";
+import Privacy from "@/pages/Privacy";
 import DashboardShell from "@/components/DashboardShell";
 import Landing from "@/pages/Landing";
 import { Login, Register, ForgotPassword, ResetPassword, VerifyEmail, AdminLogin } from "@/pages/AuthPages";
@@ -78,6 +79,7 @@ function App() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />

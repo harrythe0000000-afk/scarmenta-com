@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { TERMS, TERMS_EFFECTIVE } from "@/lib/terms";
 
 const Paras = ({ items }) => items?.map((t) => <p key={t} className="mt-2">{t}</p>);
@@ -16,6 +17,7 @@ export const TermsContent = () => (
         {s.ol && <ol className="mt-2 list-decimal space-y-1 pl-5">{s.ol.map((t) => <li key={t}>{t}</li>)}</ol>}
         {s.ul && <ul className="mt-2 list-disc space-y-1 pl-5">{s.ul.map((t) => <li key={t}>{t}</li>)}</ul>}
         <Paras items={s.after} />
+        {s.privacyLink && <Link to="/privacy" target="_blank" className="mt-2 inline-block text-purple-300 hover:text-purple-200" data-testid={`terms-privacy-link-${s.h.split(".")[0]}`}>Read the Privacy Policy</Link>}
       </section>
     ))}
     <div className="border-t border-purple-500/20 pt-4 text-center" data-testid="terms-end">
