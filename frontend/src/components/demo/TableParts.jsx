@@ -3,11 +3,11 @@ import { play } from "@/lib/sounds";
 
 export const CHIPS = [10, 50, 100, 500];
 
-export const ChipRack = ({ chip, setChip }) => (
+export const ChipRack = ({ chip, setChip, prefix = "$", values = CHIPS }) => (
   <div className="flex gap-2" data-testid="demo-chips">
-    {CHIPS.map((c) => (
+    {values.map((c) => (
       <button key={c} type="button" onClick={() => { setChip(c); play("chip"); }} data-testid={`demo-chip-${c}`}
-        className={`grid h-12 w-12 place-items-center rounded-full border-4 border-dashed font-num text-xs font-bold transition-transform ${chip === c ? "scale-110 border-white bg-purple-600 text-white" : "border-purple-300/40 bg-purple-950 text-purple-200 hover:scale-105"}`}>${c}</button>
+        className={`grid h-12 w-12 place-items-center rounded-full border-4 border-dashed font-num text-xs font-bold transition-transform ${chip === c ? "scale-110 border-white bg-purple-600 text-white" : "border-purple-300/40 bg-purple-950 text-purple-200 hover:scale-105"}`}>{prefix}{c >= 1000 ? `${c / 1000}K` : c}</button>
     ))}
   </div>
 );

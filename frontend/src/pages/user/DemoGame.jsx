@@ -20,7 +20,7 @@ import { usd } from "@/lib/format";
 const START = 1000;
 const EMPTY_STATS = { rounds: 0, wins: 0, losses: 0, pnl: 0, bestWin: 0 };
 const GAMES = [
-  ["rivals", "Scarmenta vs Rivals", RivalsTable],
+  ["rivals", "Scarmenta vs Others", RivalsTable],
   ["andar-bahar", "Andar Bahar", AndarBaharTable],
   ["teen-patti", "Teen Patti", TeenPattiTable],
   ["tutorial", "Tutorial", null],
@@ -54,13 +54,14 @@ export default function DemoGame() {
   const [best, setBest] = useState(0);
   const [game, setGame] = useState(GAMES[0][1]);
   const [langs, setLangs] = useState(loadLangs);
+  const [tab, setTab] = useState("rivals");
   const setLang = (tab) => (v) => setLangs((l) => {
     const next = { ...l, [tab]: v };
     saveLangs(next);
     return next;
   });
-  const onRound = (name) => (net) => {
-    setBalance((b) => Math.round((b + net) * 100) / 100);
+  const onRound = (name) => (net, opts = {}) => {
+    if (!opts.separate) setBalance((b) => Math.round((b + net) * 100) / 100);
     setGame(name);
     const next = net > 0 ? streak + 1 : 0;
     setStreak(next);
@@ -70,7 +71,7 @@ export default function DemoGame() {
       const rounds = st.rounds + 1;
       if (rounds === PROMPT_AFTER) setPrompt(true);
       return { rounds, wins: st.wins + (net > 0 ? 1 : 0), losses: st.losses + (net < 0 ? 1 : 0),
-        pnl: Math.round((st.pnl + net) * 100) / 100, bestWin: Math.max(st.bestWin, net) };
+        pnl: opts.separate ? st.pnl : Math.round((st.pnl + net) * 100) / 100, bestWin: opts.separate ? st.bestWin : Math.max(st.bestWin, net) };
     });
   };
   const toggleSound = () => {
@@ -83,23 +84,25 @@ export default function DemoGame() {
       <PageHeader eyebrow="Practice tables" title="Demo games" desc="Free card games to learn how betting works before you play for real." />
       <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200" data-testid="demo-disclaimer">
         <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" />
-        Practice only. You play with free demo credits, your real Scarmenta balance is never used, and nothing won here can be kept. Results are fully random.
+        Practice only. You play with free demo money, your real Scarmenta balance is never used, and nothing won here can be kept. Andar Bahar and Teen Patti are fully random; Scarmenta vs Others follows a practice pattern. Demo results do not predict real game results.
       </div>
       <Portfolio stats={stats} />
-      <Tabs defaultValue="rivals">
+      <Tabs value={tab} onValueChange={setTab}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <TabsList className="h-auto max-w-full flex-wrap justify-start bg-black/40" data-testid="demo-tabs">
-            <TabsTrigger value="rivals" data-testid="demo-tab-rivals">Scarmenta vs Rivals</TabsTrigger>
+            <TabsTrigger value="rivals" data-testid="demo-tab-rivals">Scarmenta vs Others</TabsTrigger>
             <TabsTrigger value="andar-bahar" data-testid="demo-tab-andar-bahar">Andar Bahar</TabsTrigger>
             <TabsTrigger value="teen-patti" data-testid="demo-tab-teen-patti">Teen Patti</TabsTrigger>
             <TabsTrigger value="tutorial" data-testid="demo-tab-tutorial">Tutorial</TabsTrigger>
           </TabsList>
           <div className="flex flex-wrap items-center gap-3">
             <StreakMeter streak={streak} best={best} game={game} />
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500">Demo balance</p>
-              <p className="font-num text-2xl font-bold text-white" data-testid="demo-balance">{usd(balance)}</p>
-            </div>
+            {tab !== "rivals" && (
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wider text-slate-500">Demo balance</p>
+                <p className="font-num text-2xl font-bold text-white" data-testid="demo-balance">{usd(balance)}</p>
+              </div>
+            )}
             <Button size="icon" variant="outline" onClick={toggleSound} data-testid="demo-sound-toggle" aria-label={sound ? "Mute" : "Unmute"} className="rounded-full border-purple-500/30 bg-transparent">
               {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
@@ -115,7 +118,7 @@ export default function DemoGame() {
           ))}
         </div>
       </Tabs>
-      <p className="mt-4 text-xs text-slate-500">The demo balance resets to $1,000 every time you open this page.</p>
+      <p className="mt-4 text-xs text-slate-500">Andar Bahar and Teen Patti balance resets to $1,000 every time you open this page. Scarmenta vs Others wallets are kept until you refill them.</p>
       <RealPlayPrompt open={prompt} onClose={() => setPrompt(false)} />
     </>
   );
