@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Flame, Heart, Loader2, Play, Radio, Search } from "lucide-react";
+import { Flame, Heart, History, Loader2, Play, Radio, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { defaultGameImage } from "@/lib/liveImages";
 import { EmptyState, PageHeader } from "@/components/StatCard";
@@ -10,9 +10,9 @@ import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { usd } from "@/lib/format";
 
-const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav }) => (
+const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav, tag = "" }) => (
   <div className="relative">
-  <button type="button" onClick={() => onPlay(g)} disabled={!!busy} data-testid={`live-game-${g.id}`}
+  <button type="button" onClick={() => onPlay(g)} disabled={!!busy} data-testid={`live-game-${tag}${g.id}`}
     className="group w-full overflow-hidden rounded-2xl border border-purple-500/20 bg-black/40 text-left transition-transform hover:-translate-y-1 disabled:opacity-60">
     <div className="relative h-36 bg-gradient-to-br from-violet-900 to-fuchsia-900">
       <img src={g.image_id ? bannerImg(g.image_id) : defaultGameImage(g)} alt={g.name} loading="lazy" data-testid={`live-game-img-${g.id}`}
@@ -29,7 +29,7 @@ const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav }) => (
     </div>
   </button>
   <button type="button" onClick={() => onFav(g)} aria-label={fav ? "Remove from favourites" : "Add to favourites"}
-    data-testid={`live-fav-${rank ? "top-" : ""}${g.id}`}
+    data-testid={`live-fav-${tag}${g.id}`}
     className="absolute bottom-3 right-3 grid h-8 w-8 place-items-center rounded-full bg-white/5 transition-transform hover:scale-110 active:scale-90">
     <Heart className={`h-4 w-4 transition-colors ${fav ? "fill-pink-500 text-pink-500" : "text-slate-400"}`} />
   </button>
@@ -49,6 +49,7 @@ export default function LiveCasino() {
   const { user } = useAuth();
   const { data } = useFetch("/live/games");
   const { data: popular } = useFetch("/live/popular");
+  const { data: recent } = useFetch("/live/recent");
   const { data: favs, setData: setFavs } = useFetch("/live/favourites");
   const favSet = new Set(favs || []);
   const toggleFav = async (g) => {
@@ -80,6 +81,7 @@ export default function LiveCasino() {
   const shown = (data || []).filter((g) => (provider === "All" || g.provider === provider || (provider === "Favourites" && favSet.has(g.id))) && (!term || g.name.toLowerCase().includes(term)));
   const byId = Object.fromEntries((data || []).map((g) => [g.id, g]));
   const top = provider === "All" && !term ? (popular || []).filter((p) => byId[p.id]).map((p) => ({ g: byId[p.id], rounds: p.rounds })) : [];
+  const recentGames = provider === "All" && !term ? (recent || []).map((r) => byId[r.id]).filter(Boolean) : [];
   const groups = shown.reduce((acc, g) => ({ ...acc, [g.provider]: [...(acc[g.provider] || []), g] }), {});
   return (
     <>
@@ -95,11 +97,19 @@ export default function LiveCasino() {
         </div>
       )}
       {data?.length > 0 && shown.length === 0 && <p className="text-sm text-slate-400" data-testid="live-no-results">{provider === "Favourites" && !term ? "No favourites yet. Tap the heart on any game to save it here." : "No games match. Try another name or provider."}</p>}
+      {recentGames.length > 0 && (
+        <section className="mb-8" data-testid="live-recent">
+          <p className="label-eyebrow mb-3 flex items-center gap-1.5 text-sky-300"><History className="h-4 w-4" /> Recently played</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {recentGames.map((g) => <GameTile key={g.id} g={g} busy={busy} onPlay={play} fav={favSet.has(g.id)} onFav={toggleFav} tag="recent-" />)}
+          </div>
+        </section>
+      )}
       {top.length > 0 && (
         <section className="mb-8" data-testid="live-popular">
           <p className="label-eyebrow mb-3 flex items-center gap-1.5 text-amber-300"><Flame className="h-4 w-4" /> Most played</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {top.map(({ g, rounds }, i) => <GameTile key={g.id} g={g} busy={busy} onPlay={play} rank={i + 1} rounds={rounds} fav={favSet.has(g.id)} onFav={toggleFav} />)}
+            {top.map(({ g, rounds }, i) => <GameTile key={g.id} g={g} busy={busy} onPlay={play} rank={i + 1} rounds={rounds} fav={favSet.has(g.id)} onFav={toggleFav} tag="top-" />)}
           </div>
         </section>
       )}

@@ -163,3 +163,4 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Player page: provider buttons + search box; games without image use AI default photo by name keyword (roulette/blackjack/baccarat/teen patti/andar bahar/dragon tiger/dice) else by provider (lib/liveImages.js)
 - 2026-11-13: GET /api/live/popular (all-time round counts, top 5 active games); 'Most played' row with rank badges on player page, hidden while filtering
 - 2026-11-13: Favourites: users.live_favourites; GET /api/live/favourites, PUT /api/live/favourites/{id} {favourite}; heart on each tile + 'Favourites (n)' filter button
+- 2026-11-13: Recently played row (GET /api/live/recent: user's last 5 distinct launched active games) above Most played, hidden while filtering

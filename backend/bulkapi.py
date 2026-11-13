@@ -143,6 +143,16 @@ async def set_favourite(gid: str, body: FavIn, user: dict = Depends(get_current_
     return u.get("live_favourites", [])
 
 
+@router.get("/live/recent")
+async def recent_games(user: dict = Depends(get_current_user)):
+    rows = await db.live_sessions.aggregate([
+        {"$match": {"user_id": user["id"], "status": "launched"}},
+        {"$group": {"_id": "$game_id", "last": {"$max": "$created_at"}}}, {"$sort": {"last": -1}}, {"$limit": 20}]).to_list(20)
+    active = {g["id"] for g in await db.live_games.find({"id": {"$in": [r["_id"] for r in rows]}, "active": True,
+                                                        "deleted": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(20)}
+    return [{"id": r["_id"], "last": r["last"]} for r in rows if r["_id"] in active][:5]
+
+
 @router.get("/live/popular")
 async def popular_games(_: dict = Depends(get_current_user)):
     top = await db.live_rounds.aggregate([
