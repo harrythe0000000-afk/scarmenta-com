@@ -14,7 +14,7 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
@@ -40,7 +40,11 @@ async def _ensure() -> None:
         return
     doc = await db.settings.find_one({"key": "bulkapi_creds"}, {"_id": 0}) or {}
     dec = lambda v: _FERNET.decrypt(v.encode()).decode() if v else ""
-    token, secret = dec(doc.get("token_enc")), dec(doc.get("secret_enc"))
+    try:
+        token, secret = dec(doc.get("token_enc")), dec(doc.get("secret_enc"))
+    except InvalidToken:
+        logger.error("Saved BULKAPI keys cannot be decrypted (JWT_SECRET changed?); using server keys")
+        token, secret = "", ""
     src = "admin panel" if token or secret else "server"
     _CACHE.update(at=time.time(), source=src,
                   token=token or os.environ.get("BULKAPI_API_TOKEN", "").strip(),
@@ -411,11 +415,20 @@ async def save_credentials(body: CredsIn, admin: dict = Depends(require_admin)):
         upd["secret_enc"] = _FERNET.encrypt(secret.encode()).decode()
     await db.settings.update_one({"key": "bulkapi_creds"}, {"$set": upd}, upsert=True)
     await db.audit_logs.insert_one({"id": new_id(), "action": "bulkapi_credentials_updated", "by": admin["email"],
-                                    "fields": [k for k in ("token", "secret") if locals()[k]], "created_at": now_iso()})
+                                    "fields": [k for k, v in (("token", token), ("secret", secret)) if v], "created_at": now_iso()})
     _CACHE["at"] = 0.0
     await _ensure()
     warn = "" if not secret or len(secret.encode()) == 32 else f"Secret Key has {len(secret.encode())} characters; BULKAPI keys are normally 32."
     return {"ok": True, "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]), "warning": warn}
+
+
+@router.delete("/admin/live/credentials")
+async def clear_credentials(admin: dict = Depends(require_admin)):
+    await db.settings.delete_one({"key": "bulkapi_creds"})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "bulkapi_credentials_cleared", "by": admin["email"], "created_at": now_iso()})
+    _CACHE["at"] = 0.0
+    await _ensure()
+    return {"ok": True, "source": _CACHE["source"]}
 
 
 HEADERS = {"name": ("name", "game", "game name", "game_name", "title"), "provider": ("provider", "vendor", "brand"),
@@ -453,7 +466,8 @@ async def import_games(file: UploadFile = File(...), admin: dict = Depends(requi
     added, skipped, errors, docs = 0, 0, [], []
     for n, r in enumerate(rows[1:], start=2):
         get = lambda k: (r[col[k]] if col[k] is not None and col[k] < len(r) else "").strip()
-        gname, uid, prov = get("name"), get("game_uid"), get("provider") or "Other"
+        gname, uid, prov = get("name"), get("game_uid"), get("provider")
+        prov = prov if len(prov) >= 2 else "Other"
         if len(gname) < 2 or not uid or len(uid) > 80 or len(gname) > 80:
             errors.append(f"Row {n}: missing or too long name / game_uid")
             continue

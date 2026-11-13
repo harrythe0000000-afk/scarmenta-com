@@ -152,3 +152,9 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Collections: live_sessions (launch history incl failed), live_rounds, live_callbacks (every callback, failed flag)
 - Admin tabs: Setup & games, Launch history, Bets & wins, Player report, Callback logs (components/LiveReports.jsx)
 - Keys BULKAPI_API_TOKEN/SECRET_KEY injected via process env (not in .env file); current values invalid (secret 30 bytes)
+
+## 2026-11-13 Admin-panel BULKAPI keys + bulk game import (iteration_21)
+- PUT/DELETE /api/admin/live/credentials: Fernet-encrypted (key = sha256(JWT_SECRET)) in db.settings {key:"bulkapi_creds"}; falls back to env keys; 30s cache; masked in status (source shown); rejects URL-looking token
+- POST /api/admin/live/games/import (.csv/.xlsx via openpyxl; headers name, provider, game_uid + aliases; duplicates skipped)
+- Current server env token is actually a URL ending .php (callback URL pasted by mistake) and secret is 30 chars -> user must paste real keys in Admin > Live Casino > BULKAPI keys
+- Still pending: real game_uid list from provider, bulkapi.org DNS, Lara callback -> https://scarmenta.com/api/game_callback.php

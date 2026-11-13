@@ -39,6 +39,7 @@ const StatusCard = ({ data }) => {
     <div className="card-lux space-y-2 p-6" data-testid="live-status">
       <p className="label-eyebrow mb-2">Connection</p>
       <Check ok={data.token_set} label="API token saved" />
+      <p className="pl-6 text-xs text-slate-500" data-testid="live-creds-source">Keys in use from: {data.source === "admin panel" ? "Admin panel" : "Server settings"}</p>
       <Check ok={data.secret_set && data.secret_bytes === 32} label={`Secret key saved (${data.secret_bytes}/32 characters)`} />
       <Check ok={data.inr_rate > 0} label={`INR rate $1 = ₹${data.inr_rate}`} />
       <Check ok={data.rounds > 0} label={`${data.rounds} game rounds received`} />
@@ -89,6 +90,10 @@ const CredsCard = ({ data, reload }) => {
       {f.secret_key && <p className={`text-xs ${f.secret_key.trim().length === 32 ? "text-emerald-300" : "text-amber-300"}`} data-testid="live-creds-secret-length">{f.secret_key.trim().length}/32 characters</p>}
       <label className="flex items-center gap-2 text-xs text-slate-400"><Switch checked={show} onCheckedChange={setShow} data-testid="live-creds-show-toggle" /> Show what I type</label>
       <Button data-testid="live-creds-save" className="w-full rounded-full bg-purple-600 hover:bg-purple-500">Save keys</Button>
+      {data.source === "admin panel" && (
+        <button type="button" data-testid="live-creds-clear" className="w-full text-center text-xs text-slate-500 underline hover:text-red-300"
+          onClick={() => window.confirm("Remove the keys saved here and use the server keys instead?") && run(() => api.delete("/admin/live/credentials"), "Saved keys removed", reload)}>Remove keys saved here</button>
+      )}
     </form>
   );
 };
