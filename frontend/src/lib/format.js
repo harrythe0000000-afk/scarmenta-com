@@ -33,6 +33,7 @@ export const TX_TYPES = {
   share_bonus: "Share Bonus",
   sharer_reward: "Top Sharer Reward",
   contest_bonus: "Contest Prize",
+  live_round: "Live Casino",
   loss_reward: "Loss Reward",
   transfer_out: "Transfer Out",
   transfer_in: "Transfer In",

@@ -10,6 +10,7 @@ import agents
 import content
 import assistant
 import contest
+import bulkapi
 
 import asyncio
 import logging
@@ -35,6 +36,7 @@ INDEXES: dict[str, list[IndexModel]] = {
               IndexModel([("referral_code", ASCENDING)], name="referral_code", unique=True, sparse=True),
               IndexModel([("referred_by", ASCENDING)], name="referred_by"),
               IndexModel([("agent_code", ASCENDING)], name="agent_code", unique=True, sparse=True),
+              IndexModel([("bulk_player_id", ASCENDING)], name="bulk_player_id", unique=True, sparse=True),
               IndexModel([("agent_id", ASCENDING)], name="agent_id")],
     "deposits": [IndexModel([("id", ASCENDING)], name="id", unique=True),
                  IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
@@ -63,6 +65,7 @@ INDEXES: dict[str, list[IndexModel]] = {
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
     "chat_messages": [IndexModel([("user_id", ASCENDING), ("session_id", ASCENDING), ("created_at", ASCENDING)], name="user_session")],
+    "live_rounds": [IndexModel([("game_round", ASCENDING)], name="game_round", unique=True)],
     "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
                                  name="banner_user_type", unique=True)],
 }
@@ -883,6 +886,7 @@ app.include_router(agents.router)
 app.include_router(content.router)
 app.include_router(assistant.router)
 app.include_router(contest.router)
+app.include_router(bulkapi.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 

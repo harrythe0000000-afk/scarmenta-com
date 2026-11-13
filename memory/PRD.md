@@ -129,3 +129,19 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 ## 2026-11-12 Contest winner popup
 - WinnerPopup (confetti, prize, winning screenshot, Share again -> /app/demo-game) shown once per win (winner_seen flag); before admin popups
 - API: GET /api/contest/unseen-wins, POST /api/contest/entries/{id}/seen
+
+## 2026-11-12 BULKAPI live casino (code complete, awaiting correct credentials)
+- Doc: launch GET {BASE}/launch_game/?user_id,wallet_amount,game_uid,token,timestamp,payload(AES-256-ECB base64 of JSON, key=secret padded to 32). Callback POST form (mobile,bet_amount,win_amount,game_uid,game_round,token,...) -> return "ok"
+- Doc says bulkapi.org but it has no DNS; bulkapi.site/launch_game/ responds -> BULKAPI_BASE_URL=https://bulkapi.site in backend/.env
+- Real call result: {"status":"error","message":"Token not found or secret key missing in database."} -> stored BULKAPI_API_TOKEN is a URL (35 chars, wrong field), secret 30 chars (expected 32)
+- backend/bulkapi.py: per-user 10-digit bulk_player_id, INR conversion via fx_rates.INR, callback token check (+ optional BULKAPI_CALLBACK_IPS), idempotent per game_round with delta updates, tx type live_round, GGR by provider
+- Pages: /app/live-casino, /admin/live-casino (status, callback URL, games CRUD, GGR)
+- Callback URL must be set in BULKAPI portal (single callback; currently Lara.in)
+
+## 2026-11-13 BULKAPI backend rebuilt from GGR-integration-doc.pdf
+- backend/bulkapi.py rewritten: launch GET bulkapi.site/launch_game/ (AES-256-ECB PKCS7 base64, PHP-style key pad), callback form/JSON, token check, idempotent per game_round (duplicate = update delta), returns "ok"
+- Separate admin-editable live rate: db.settings {key:"live_casino", inr_rate} default 95; PUT /api/admin/live/rate
+- POST /api/admin/live/test -> real launch call to BULKAPI, shows its reply. Admin LiveCasino page: Rate + Test cards
+- Callback verified via curl (+$2 win, duplicate ignored, update applied delta). Live launch still fails: "Token not found or secret key missing" -> user skipped key card twice
+- User chose: callback URL moves to https://scarmenta.com/api/bulkapi/callback (Lara.in will stop); Scarmenta prod IP must be whitelisted at BULKAPI
+- Pending (user deferred): Scarmenta vs Others rigged odds + 50% profit message
