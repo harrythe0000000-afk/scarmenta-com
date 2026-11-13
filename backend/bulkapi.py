@@ -1,6 +1,7 @@
 import base64
 import hmac
 import json
+import math
 import logging
 import os
 import re
@@ -118,7 +119,9 @@ async def toggle_game(gid: str, body: GamePatch, _: dict = Depends(require_admin
 
 @router.delete("/admin/live/games/{gid}")
 async def delete_game(gid: str, _: dict = Depends(require_admin)):
-    await db.live_games.update_one({"id": gid}, {"$set": {"deleted": True, "active": False}})
+    r = await db.live_games.update_one({"id": gid, "deleted": {"$ne": True}}, {"$set": {"deleted": True, "active": False}})
+    if not r.matched_count:
+        raise HTTPException(status_code=404, detail="Game not found")
     return {"ok": True}
 
 
@@ -164,9 +167,12 @@ async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
 # ---------- Callback ----------
 def _f(form, key: str) -> float:
     try:
-        return round(float(form.get(key) or 0), 2)
+        v = float(form.get(key) or 0)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid {key}")
+    if not math.isfinite(v):
+        raise HTTPException(status_code=400, detail=f"Invalid {key}")
+    return round(v, 2)
 
 
 async def _read_form(request: Request) -> dict:
@@ -208,9 +214,11 @@ async def handle_callback(request: Request):
         return await _log_cb(request, form, "unknown player", 404)
     game = await db.live_games.find_one({"game_uid": form.get("game_uid", "")}, {"_id": 0, "provider": 1, "name": 1})
     prev = await db.live_rounds.find_one({"game_round": rnd}, {"_id": 0})
+    if prev and prev["user_id"] != user["id"]:
+        return await _log_cb(request, form, "game_round belongs to another player", 409)
     rate = prev["rate"] if prev else await live_rate()
-    change_usd = round((win - bet) / rate, 4)
-    delta = round(change_usd - (prev["applied_usd"] if prev else 0), 4)
+    change_usd = round((win - bet) / rate, 2)
+    delta = round(change_usd - (prev["applied_usd"] if prev else 0), 2)
     raw = {k: v for k, v in form.items() if k != "token"}
     doc = {"game_round": rnd, "user_id": user["id"], "user_email": user.get("email"), "player_id": mobile,
            "game_uid": raw.get("game_uid"), "provider": (game or {}).get("provider", "Unknown"),
@@ -242,7 +250,7 @@ async def handle_callback(request: Request):
     if u["promo_balance"] < 0:
         logger.error(f"Live round {rnd} left user {u['id']} negative: {u['promo_balance']}")
         note += " (balance negative)"
-    return await _log_cb(request, form, f"{note} {delta:+.4f} USD", 200)
+    return await _log_cb(request, form, f"{note} {delta:+.2f} USD", 200)
 
 
 @router.post("/bulkapi/callback", response_class=PlainTextResponse)
@@ -269,7 +277,7 @@ async def set_rate(body: RateIn, admin: dict = Depends(require_admin)):
 
 async def _reachable() -> bool:
     try:
-        async with httpx.AsyncClient(timeout=6, follow_redirects=False) as c:
+        async with httpx.AsyncClient(timeout=4, follow_redirects=False) as c:
             await c.head(LAUNCH_URL)
         return True
     except httpx.HTTPError:

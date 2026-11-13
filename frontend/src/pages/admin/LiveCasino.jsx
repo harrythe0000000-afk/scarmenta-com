@@ -33,8 +33,7 @@ const Check = ({ ok, label }) => (
   <p className="flex items-center gap-2 text-sm">{ok ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-red-400" />}<span className="text-slate-300">{label}</span></p>
 );
 
-const StatusCard = () => {
-  const { data } = useFetch("/admin/live/status");
+const StatusCard = ({ data }) => {
   if (!data) return null;
   return (
     <div className="card-lux space-y-2 p-6" data-testid="live-status">
@@ -59,8 +58,7 @@ const StatusCard = () => {
   );
 };
 
-const RateCard = () => {
-  const { data, reload } = useFetch("/admin/live/status");
+const RateCard = ({ data, reload }) => {
   const [rate, setRate] = useState("");
   if (!data) return null;
   const save = (e) => {
@@ -191,6 +189,7 @@ export default function AdminLiveCasino() {
   const { user } = useAuth();
   const canEdit = user?.role === "admin";
   const { data, reload } = useFetch("/admin/live/games");
+  const status = useFetch("/admin/live/status");
   return (
     <>
       <PageHeader eyebrow="BULKAPI" title="Live casino" desc="Manage live dealer games, check the BULKAPI connection and see GGR by provider." />
@@ -205,8 +204,8 @@ export default function AdminLiveCasino() {
         <TabsContent value="setup">
           <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
             <div className="space-y-6">
-              <StatusCard />
-              {canEdit && <RateCard />}
+              <StatusCard data={status.data} />
+              {canEdit && <RateCard data={status.data} reload={status.reload} />}
               {canEdit && <TestCard />}
               {canEdit && <AddGame onDone={reload} />}
             </div>

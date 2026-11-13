@@ -145,3 +145,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Callback verified via curl (+$2 win, duplicate ignored, update applied delta). Live launch still fails: "Token not found or secret key missing" -> user skipped key card twice
 - User chose: callback URL moves to https://scarmenta.com/api/bulkapi/callback (Lara.in will stop); Scarmenta prod IP must be whitelisted at BULKAPI
 - Pending (user deferred): Scarmenta vs Others rigged odds + 50% profit message
+
+## 2026-11-13 GGR Live Casino full integration (iteration_20)
+- Launch: BULKAPI_BASE_URL=https://bulkapi.org (user chose .org only; .org has NO DNS right now -> launches fail until provider fixes it; bulkapi.site works as same system)
+- Callbacks: /api/bulkapi/callback AND /api/game_callback.php (form or JSON). Token check, optional IP whitelist BULKAPI_CALLBACK_IPS, non-finite amounts rejected, round owner check (409), 2-decimal USD deltas, settled flag
+- Collections: live_sessions (launch history incl failed), live_rounds, live_callbacks (every callback, failed flag)
+- Admin tabs: Setup & games, Launch history, Bets & wins, Player report, Callback logs (components/LiveReports.jsx)
+- Keys BULKAPI_API_TOKEN/SECRET_KEY injected via process env (not in .env file); current values invalid (secret 30 bytes)

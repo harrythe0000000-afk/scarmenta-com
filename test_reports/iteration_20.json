@@ -1,0 +1,39 @@
+{
+  "summary": "BULKAPI live casino integration tested end-to-end. Backend: 15/16 pytest pass (launch URL w/ 6 params + wallet_inr=promo_balance*rate, failed launch logging, callbacks on both paths: win/loss/exact duplicate/same-round update by difference, 403 invalid token, 400 missing fields, 404 unknown mobile, JSON body, admin status/rate/test/sessions/rounds/players/callbacks filters, games CRUD + staff 403s). One real bug: callback accepts bet_amount='nan' (and likely 'inf') -> player promo_balance becomes NaN and /api/admin/live/players returns 500. Frontend: admin /admin/live-casino all 5 tabs + tables, filters, rate save, test connection (ConnectError expected), callback URLs OK; player /app/live-casino lists games and click navigates to https://bulkapi.org/launch_game with all params (DNS fail expected). Regression pages /app, /app/deposits, /app/statement, /app/games, /admin/deposits load without console errors.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/bulkapi/callback & /api/game_callback.php", "issue": "_f() uses float() which accepts 'nan'/'inf'. bet_amount=nan with valid token returns 'ok', $inc NaN into users.promo_balance (balance becomes NaN), inserts NaN transaction/round; afterwards GET /api/admin/live/players 500s with 'ValueError: Out of range float values are not JSON compliant' (and any endpoint serializing that balance/tx will too). Fix: reject non-finite values (math.isfinite) in _f and return 400.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "callback update path", "issue": "When prev round exists, user is not checked against prev['user_id']; a game_round reused with a different mobile would compute delta against another user's applied_usd and reassign the round. Add check prev.user_id == user.id (else 409/log)."},
+      {"endpoint": "callback -> transactions", "issue": "make_tx rounds amount to 2 decimals while promo_balance is $inc'd by 4-decimal delta (e.g. ₹1 at rate 95 = $0.0105 -> tx shows $0.01); ledger won't reconcile exactly with balance over many rounds."},
+      {"endpoint": "DELETE /api/admin/live/games/{id}", "issue": "Returns ok even for unknown id (no 404)."},
+      {"endpoint": "GET /api/admin/live/status", "issue": "Does a live HEAD to bulkapi.org (6s timeout) on every call; admin page calls it twice (StatusCard + RateCard) -> slow page load while DNS is down."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Admin LiveCasino StatusCard", "issue": "After saving a new rate in RateCard, the Connection card still shows the old 'INR rate $1 = ₹95' (separate useFetch, not reloaded). Share one fetch or reload both.", "selector": "[data-testid='live-status']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_live_casino_bulkapi.py", "/app/test_reports/pytest/live_casino.xml"],
+  "action_items": [
+    "Reject non-finite bet_amount/win_amount (nan/inf) in bulkapi._f -> 400 'Invalid bet_amount'",
+    "Verify prev round belongs to same user before applying update delta",
+    "Reload StatusCard after rate save (or share data between StatusCard/RateCard)",
+    "Optional: 404 on deleting unknown game; cache reachable check in /admin/live/status"
+  ],
+  "critical_code_review_comments": [
+    "Idempotency logic (unique game_round + conditional update on applied_usd + $inc) verified correct for exact duplicates and amount updates",
+    "Non-finite float input is the only path found that corrupts balances",
+    "Secret key is 30 bytes (status shows 30/32) - user to supply real key; not counted as bug"
+  ],
+  "updated_files": ["/app/backend/tests/test_live_casino_bulkapi.py"],
+  "success_rate": {"backend": "94% (15/16)", "frontend": "95%"},
+  "seed_data_creation": "None persisted. All TEST_ games/rounds/callbacks/sessions/LIVE-* transactions deleted; demo promo_balance restored to 1039; live inr_rate restored to 95. live_* collections are empty after testing.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export BULK_TOKEN from /proc/<uvicorn pid>/environ and REACT_APP_BACKEND_URL, then pytest tests/test_live_casino_bulkapi.py -n 0. Module fixture cleans up and resets demo balance to 1039. test_nan_amount_rejected is expected to pass once fix is applied. bulkapi.org has no DNS (reachable=false, test returns ConnectError) - expected."
+}
