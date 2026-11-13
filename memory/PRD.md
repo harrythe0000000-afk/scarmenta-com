@@ -158,3 +158,6 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - POST /api/admin/live/games/import (.csv/.xlsx via openpyxl; headers name, provider, game_uid + aliases; duplicates skipped)
 - Current server env token is actually a URL ending .php (callback URL pasted by mistake) and secret is 30 chars -> user must paste real keys in Admin > Live Casino > BULKAPI keys
 - Still pending: real game_uid list from provider, bulkapi.org DNS, Lara callback -> https://scarmenta.com/api/game_callback.php
+
+## 2026-11-13 Live casino player filters + default photos
+- Player page: provider buttons + search box; games without image use AI default photo by name keyword (roulette/blackjack/baccarat/teen patti/andar bahar/dragon tiger/dice) else by provider (lib/liveImages.js)
