@@ -121,6 +121,28 @@ async def player_games(_: dict = Depends(get_current_user)):
     return [{k: v for k, v in g.items() if k not in ("_id", "game_uid")} for g in rows]
 
 
+class FavIn(BaseModel):
+    favourite: bool
+
+
+@router.get("/live/favourites")
+async def get_favourites(user: dict = Depends(get_current_user)):
+    return user.get("live_favourites", [])
+
+
+@router.put("/live/favourites/{gid}")
+async def set_favourite(gid: str, body: FavIn, user: dict = Depends(get_current_user)):
+    if body.favourite:
+        if not await db.live_games.find_one({"id": gid, "active": True, "deleted": {"$ne": True}}, {"_id": 1}):
+            raise HTTPException(status_code=404, detail="Game not available")
+        upd = {"$addToSet": {"live_favourites": gid}}
+    else:
+        upd = {"$pull": {"live_favourites": gid}}
+    u = await db.users.find_one_and_update({"id": user["id"]}, upd, projection={"_id": 0, "live_favourites": 1},
+                                           return_document=ReturnDocument.AFTER)
+    return u.get("live_favourites", [])
+
+
 @router.get("/live/popular")
 async def popular_games(_: dict = Depends(get_current_user)):
     top = await db.live_rounds.aggregate([
