@@ -121,6 +121,16 @@ async def player_games(_: dict = Depends(get_current_user)):
     return [{k: v for k, v in g.items() if k not in ("_id", "game_uid")} for g in rows]
 
 
+@router.get("/live/popular")
+async def popular_games(_: dict = Depends(get_current_user)):
+    top = await db.live_rounds.aggregate([
+        {"$group": {"_id": "$game_uid", "rounds": {"$sum": 1}}}, {"$sort": {"rounds": -1}}, {"$limit": 30}]).to_list(30)
+    games = await db.live_games.find({"game_uid": {"$in": [t["_id"] for t in top]}, "active": True, "deleted": {"$ne": True}},
+                                     {"_id": 0, "id": 1, "game_uid": 1}).to_list(30)
+    ids = {g["game_uid"]: g["id"] for g in games}
+    return [{"id": ids[t["_id"]], "rounds": t["rounds"]} for t in top if t["_id"] in ids][:5]
+
+
 @router.get("/admin/live/games")
 async def admin_games(_: dict = Depends(require_staff)):
     rows = await db.live_games.find({"deleted": {"$ne": True}}, FIELDS).sort("created_at", -1).to_list(500)

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Play, Radio, Search } from "lucide-react";
+import { Flame, Loader2, Play, Radio, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { defaultGameImage } from "@/lib/liveImages";
 import { EmptyState, PageHeader } from "@/components/StatCard";
@@ -10,20 +10,21 @@ import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { usd } from "@/lib/format";
 
-const GameTile = ({ g, busy, onPlay }) => (
+const GameTile = ({ g, busy, onPlay, rank, rounds }) => (
   <button type="button" onClick={() => onPlay(g)} disabled={!!busy} data-testid={`live-game-${g.id}`}
     className="group overflow-hidden rounded-2xl border border-purple-500/20 bg-black/40 text-left transition-transform hover:-translate-y-1 disabled:opacity-60">
     <div className="relative h-36 bg-gradient-to-br from-violet-900 to-fuchsia-900">
       <img src={g.image_id ? bannerImg(g.image_id) : defaultGameImage(g)} alt={g.name} loading="lazy" data-testid={`live-game-img-${g.id}`}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white"><Radio className="h-3 w-3" /> LIVE</span>
+      {rank && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-amber-400 font-num text-xs font-bold text-black" data-testid={`live-popular-rank-${rank}`}>#{rank}</span>}
       <span className="absolute inset-0 grid place-items-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
         {busy === g.id ? <Loader2 className="h-8 w-8 animate-spin text-white" /> : <Play className="h-10 w-10 text-white" />}
       </span>
     </div>
     <div className="p-3">
       <p className="truncate font-semibold text-white">{g.name}</p>
-      <p className="text-xs text-slate-400">{g.provider}</p>
+      <p className="text-xs text-slate-400">{g.provider}{rounds ? ` · ${rounds.toLocaleString()} rounds played` : ""}</p>
     </div>
   </button>
 );
@@ -40,6 +41,7 @@ const ProviderBar = ({ providers, value, onChange }) => (
 export default function LiveCasino() {
   const { user } = useAuth();
   const { data } = useFetch("/live/games");
+  const { data: popular } = useFetch("/live/popular");
   const [busy, setBusy] = useState(null);
   const [provider, setProvider] = useState("All");
   const [q, setQ] = useState("");
@@ -56,6 +58,8 @@ export default function LiveCasino() {
   const providers = [...new Set((data || []).map((g) => g.provider))].sort();
   const term = q.trim().toLowerCase();
   const shown = (data || []).filter((g) => (provider === "All" || g.provider === provider) && (!term || g.name.toLowerCase().includes(term)));
+  const byId = Object.fromEntries((data || []).map((g) => [g.id, g]));
+  const top = provider === "All" && !term ? (popular || []).filter((p) => byId[p.id]).map((p) => ({ g: byId[p.id], rounds: p.rounds })) : [];
   const groups = shown.reduce((acc, g) => ({ ...acc, [g.provider]: [...(acc[g.provider] || []), g] }), {});
   return (
     <>
@@ -71,6 +75,14 @@ export default function LiveCasino() {
         </div>
       )}
       {data?.length > 0 && shown.length === 0 && <p className="text-sm text-slate-400" data-testid="live-no-results">No games match. Try another name or provider.</p>}
+      {top.length > 0 && (
+        <section className="mb-8" data-testid="live-popular">
+          <p className="label-eyebrow mb-3 flex items-center gap-1.5 text-amber-300"><Flame className="h-4 w-4" /> Most played</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {top.map(({ g, rounds }, i) => <GameTile key={g.id} g={g} busy={busy} onPlay={play} rank={i + 1} rounds={rounds} />)}
+          </div>
+        </section>
+      )}
       <div className="space-y-8" data-testid="live-games">
         {Object.entries(groups).map(([p, games]) => (
           <section key={p}>
