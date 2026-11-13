@@ -170,3 +170,4 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Bigger-bet side loses exactly 3 of every 5 rounds (lib/rivalsEngine.js); Repeat/Double bet; tie removed
 - Result: Others win shows profit, credit cost (bet/promo_multiplier) and net; disclaimer states this table follows a practice pattern
 - 2026-11-13: Hedge share card: totals (rounds, othersWins, othersProfit, creditCost, net) persisted in rivals state; 'Total net profit' bar + WhatsApp image (renderHedgeImage) with referral code, only when net > 0
+- 2026-11-13: Demo share tracking: signup_source 'demo_share' (register ?src=demo&ref=CODE), share_visits.source; GET /api/admin/demo-shares {visits, signups, deposited, deposit_total}; card on Admin > Top sharers. demo_share signups do NOT get the calc share bonus

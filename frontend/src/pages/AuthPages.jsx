@@ -210,14 +210,15 @@ export const Register = () => {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const fromShare = params.get("src") === "calc" && !!params.get("ref");
+  const shareSource = { calc: "calc_share", demo: "demo_share" }[params.get("src")];
+  const fromShare = !!shareSource && !!params.get("ref");
   useEffect(() => {
     const code = params.get("ref");
-    const key = `scarmenta_share_visit_${code}`;
+    const key = `scarmenta_share_visit_${shareSource}_${code}`;
     if (!fromShare || localStorage.getItem(key)) return;
     localStorage.setItem(key, "1");
-    api.post("/share/visit", { code }).catch(() => {});
-  }, [fromShare, params]);
+    api.post("/share/visit", { code, source: shareSource }).catch(() => {});
+  }, [fromShare, shareSource, params]);
   const submit = async (e) => {
     e.preventDefault();
     if (!agree) return setError("Please confirm you are 18+ and in an authorized jurisdiction.");
@@ -225,7 +226,7 @@ export const Register = () => {
     setBusy(true);
     setError("");
     try {
-      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null, accepted_terms: true, terms_version: TERMS_VERSION, signup_source: fromShare && form.referral_code.trim().toUpperCase() === params.get("ref").toUpperCase() ? "calc_share" : null });
+      const u = await register({ ...form, country: form.country || null, referral_code: form.referral_code || null, agent_code: form.agent_code || null, accepted_terms: true, terms_version: TERMS_VERSION, signup_source: fromShare && form.referral_code.trim().toUpperCase() === params.get("ref").toUpperCase() ? shareSource : null });
       toast.success(u.verification_sent ? "Account created — check your inbox to verify your email." : "Account created. Use 'Resend email' to get your verification link.");
       navigate("/app");
     } catch (err) {

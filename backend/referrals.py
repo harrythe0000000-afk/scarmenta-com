@@ -1,6 +1,6 @@
 import hashlib
 from datetime import timedelta
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -63,6 +63,7 @@ async def reward_referrer(dep: dict) -> None:
 
 class ShareVisitIn(BaseModel):
     code: str = Field(min_length=3, max_length=20)
+    source: Literal["calc_share", "demo_share"] = "calc_share"
 
 
 @router.post("/share/visit")
@@ -71,9 +72,8 @@ async def share_visit(body: ShareVisitIn, request: Request):
     if ref:
         ip = hashlib.sha256(client_ip(request).encode()).hexdigest()[:24]
         day = (now() - timedelta(hours=24)).isoformat()
-        await db.share_visits.update_one({"referrer_id": ref["id"], "ip_hash": ip, "created_at": {"$gt": day}},
-                                         {"$setOnInsert": {"referrer_id": ref["id"], "ip_hash": ip, "source": "calc_share",
-                                                           "created_at": now_iso()}}, upsert=True)
+        await db.share_visits.update_one({"referrer_id": ref["id"], "ip_hash": ip, "source": body.source, "created_at": {"$gt": day}},
+                                         {"$setOnInsert": {"created_at": now_iso()}}, upsert=True)
     return {"ok": True}
 
 
@@ -82,7 +82,7 @@ async def share_me(user: dict = Depends(get_current_user)):
     s = await get_settings()
     q = {"referred_by": user["id"], "signup_source": "calc_share"}
     return {"bonus_amount": s.get("share_bonus_amount", 0),
-            "visits": await db.share_visits.count_documents({"referrer_id": user["id"]}),
+            "visits": await db.share_visits.count_documents({"referrer_id": user["id"], "source": {"$ne": "demo_share"}}),
             "signups": await db.users.count_documents(q),
             "deposited": len(await db.deposits.distinct("user_id", {
                 "status": "approved", "user_id": {"$in": await db.users.distinct("id", q)}})),
@@ -150,6 +150,17 @@ async def sharer_leaderboard(user: dict = Depends(get_current_user)):
 
 class SharerRewardIn(BaseModel):
     amounts: List[float] = Field(min_length=1, max_length=3)
+
+
+@router.get("/admin/demo-shares")
+async def admin_demo_shares(_: dict = Depends(require_admin)):
+    ids = await db.users.distinct("id", {"signup_source": "demo_share"})
+    dep = await db.deposits.aggregate([
+        {"$match": {"status": "approved", "user_id": {"$in": ids}}},
+        {"$group": {"_id": None, "users": {"$addToSet": "$user_id"}, "total": {"$sum": "$amount"}}}]).to_list(1)
+    d = dep[0] if dep else {"users": [], "total": 0}
+    return {"visits": await db.share_visits.count_documents({"source": "demo_share"}), "signups": len(ids),
+            "deposited": len(d["users"]), "deposit_total": round(d["total"], 2)}
 
 
 @router.get("/admin/sharers")

@@ -101,7 +101,7 @@ class RegisterIn(BaseModel):
     agent_code: Optional[str] = Field(default=None, max_length=20)
     accepted_terms: bool = False
     terms_version: Optional[str] = Field(default=None, max_length=20)
-    signup_source: Optional[Literal["calc_share"]] = None
+    signup_source: Optional[Literal["calc_share", "demo_share"]] = None
 
 
 class LoginIn(BaseModel):
