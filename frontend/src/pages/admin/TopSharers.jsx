@@ -14,12 +14,13 @@ const DemoShareStats = () => {
   const { data } = useFetch("/admin/demo-shares");
   if (!data) return null;
   const items = [["Link opens", data.visits, "demo-shares-visits"], ["Joined", data.signups, "demo-shares-signups"],
-    ["Deposited", data.deposited, "demo-shares-deposited"], ["Deposits total", usd(data.deposit_total), "demo-shares-total"]];
+    ["Deposited", data.deposited, "demo-shares-deposited"], ["Deposits total", usd(data.deposit_total), "demo-shares-total"],
+    ["Bonuses paid", `${data.bonus_count} · ${usd(data.bonus_total)}`, "demo-shares-bonus"]];
   return (
     <div className="card-lux mb-6 p-6" data-testid="demo-shares-card">
       <p className="label-eyebrow">Demo profit images (all time)</p>
       <p className="mt-1 text-xs text-slate-500">People who opened a link from a Scarmenta vs Others profit image shared on WhatsApp.</p>
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-5">
         {items.map(([l, v, id]) => (
           <div key={id}>
             <p className="text-[11px] uppercase tracking-wider text-slate-500">{l}</p>

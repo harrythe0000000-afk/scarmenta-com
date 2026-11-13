@@ -37,6 +37,7 @@ DEFAULT_SETTINGS = {
     "deposit_alerts": True,
     "transfer_fee_percent": 5.0,
     "share_bonus_amount": 5.0,
+    "demo_share_bonus_amount": 5.0,
     "packages": [50.0, 100.0, 250.0, 500.0, 1000.0],
     "fx_rates": {"INR": 95.0, "AED": 3.67, "PKR": 280.0, "BDT": 120.0, "NPR": 152.0, "LKR": 300.0,
                  "SAR": 3.75, "QAR": 3.64, "KWD": 0.31, "OMR": 0.385, "BHD": 0.376},

@@ -191,6 +191,7 @@ class SettingsIn(BaseModel):
     deposit_alerts: bool
     transfer_fee_percent: float = Field(ge=0, le=50)
     share_bonus_amount: Optional[float] = Field(default=None, ge=0, le=1000)
+    demo_share_bonus_amount: Optional[float] = Field(default=None, ge=0, le=1000)
     packages: List[float] = Field(min_length=1, max_length=8)
     fx_rates: Dict[str, float]
     upi_id: str = Field(max_length=100)
@@ -459,7 +460,7 @@ async def public_config():
     s = await get_settings()
     out = {k: s[k] for k in ("promo_multiplier", "min_deposit", "max_deposit", "packages", "fx_rates",
                              "referral_bonus_percent", "loss_reward_percent", "transfer_fee_percent",
-                             "share_bonus_amount")}
+                             "share_bonus_amount", "demo_share_bonus_amount")}
     out["currency"] = "USD"
     out["payment"] = {"upi_id": s["upi_id"], "usdt": {n: s[k] for n, k in NETWORKS.items()}}
     return out

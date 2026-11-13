@@ -4,12 +4,15 @@ import { Share2, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { renderHedgeImage, shareBlob } from "@/lib/shareImage";
 import { inr } from "@/components/demo/RivalsWallets";
+import { useConfig } from "@/lib/hooks";
+import { usd } from "@/lib/format";
 
 const FILE = "scarmenta-demo-profit.png";
 
 export const HedgeShare = ({ totals }) => {
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
+  const bonus = useConfig()?.demo_share_bonus_amount ?? 0;
   if (!totals?.rounds) return null;
   const share = async () => {
     const code = user?.referral_code;
@@ -32,6 +35,7 @@ export const HedgeShare = ({ totals }) => {
         <TrendingUp className={`h-5 w-5 ${up ? "text-emerald-300" : "text-red-300"}`} />
         <div>
           <p className="text-[11px] uppercase tracking-wider text-slate-500">Total net profit · {totals.rounds} rounds</p>
+          {bonus > 0 && up && <p className="text-[11px] text-emerald-300/80" data-testid="hedge-bonus-hint">Earn {usd(bonus)} credits for every friend who joins from your image and deposits</p>}
           <p className={`font-num text-xl font-bold ${up ? "text-emerald-300" : "text-red-300"}`} data-testid="hedge-total-net">{totals.net < 0 ? "−" : "+"}{inr(Math.abs(totals.net))}</p>
         </div>
       </div>

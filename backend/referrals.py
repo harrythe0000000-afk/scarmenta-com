@@ -89,13 +89,21 @@ async def share_me(user: dict = Depends(get_current_user)):
             "earned": round(user.get("share_earnings", 0), 2)}
 
 
+SHARE_BONUS = {"calc_share": ("share_bonus_amount", "calculator image"), "demo_share": ("demo_share_bonus_amount", "demo profit image")}
+
+
 async def reward_share(dep: dict) -> None:
+    u = await db.users.find_one({"id": dep["user_id"]}, {"_id": 0, "signup_source": 1})
+    src = (u or {}).get("signup_source")
+    if src not in SHARE_BONUS:
+        return
+    key, label = SHARE_BONUS[src]
     s = await get_settings()
-    bonus = round(float(s.get("share_bonus_amount", 0)), 2)
+    bonus = round(float(s.get(key, 0)), 2)
     if bonus <= 0:
         return
     referee = await db.users.find_one_and_update(
-        {"id": dep["user_id"], "signup_source": "calc_share", "referred_by": {"$ne": None}, "share_bonus_paid": {"$ne": True}},
+        {"id": dep["user_id"], "signup_source": src, "referred_by": {"$ne": None}, "share_bonus_paid": {"$ne": True}},
         {"$set": {"share_bonus_paid": True, "share_bonus": bonus, "share_bonus_at": now_iso()}},
         projection={"_id": 0, "name": 1, "referred_by": 1})
     if not referee:
@@ -106,7 +114,7 @@ async def reward_share(dep: dict) -> None:
     if referrer:
         await db.transactions.insert_one(make_tx(
             referrer, "share_bonus", "credit", bonus,
-            f"Share bonus: {mask_name(referee['name'])} joined from your calculator image and made a first deposit",
+            f"Share bonus: {mask_name(referee['name'])} joined from your {label} and made a first deposit",
             dep["reference"], referrer["promo_balance"]))
 
 
@@ -159,8 +167,12 @@ async def admin_demo_shares(_: dict = Depends(require_admin)):
         {"$match": {"status": "approved", "user_id": {"$in": ids}}},
         {"$group": {"_id": None, "users": {"$addToSet": "$user_id"}, "total": {"$sum": "$amount"}}}]).to_list(1)
     d = dep[0] if dep else {"users": [], "total": 0}
+    paid = await db.users.aggregate([{"$match": {"signup_source": "demo_share", "share_bonus_paid": True}},
+                                     {"$group": {"_id": None, "n": {"$sum": 1}, "total": {"$sum": "$share_bonus"}}}]).to_list(1)
+    p = paid[0] if paid else {"n": 0, "total": 0}
     return {"visits": await db.share_visits.count_documents({"source": "demo_share"}), "signups": len(ids),
-            "deposited": len(d["users"]), "deposit_total": round(d["total"], 2)}
+            "deposited": len(d["users"]), "deposit_total": round(d["total"], 2),
+            "bonus_count": p["n"], "bonus_total": round(p["total"], 2)}
 
 
 @router.get("/admin/sharers")
