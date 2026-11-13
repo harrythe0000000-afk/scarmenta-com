@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { PlayingCard } from "@/components/demo/PlayingCard";
 import { BetSpot, ChipRack } from "@/components/demo/TableParts";
 import { RefillDialog, RivalsResult, RivalsWallets, cr, inr } from "@/components/demo/RivalsWallets";
-import { START, cardsFor, loadState, pickWinner, saveState, settle } from "@/lib/rivalsEngine";
+import { START, addTotals, cardsFor, loadState, pickWinner, saveState, settle } from "@/lib/rivalsEngine";
+import { HedgeShare } from "@/components/demo/HedgeShare";
 import { useConfig } from "@/lib/hooks";
 import { play } from "@/lib/sounds";
 import { t } from "@/lib/demoText";
@@ -59,7 +60,8 @@ export const RivalsTable = ({ onRound, lang }) => {
     setTimeout(() => play("flip"), 350);
     setTimeout(() => {
       play(s.net >= 0 ? "win" : "lose");
-      setState((st) => ({ schedule, wallets: { scarmenta: st.wallets.scarmenta + s.change.scarmenta, others: st.wallets.others + s.change.others } }));
+      setState((st) => ({ schedule, totals: addTotals(st.totals, placed, winner, s),
+        wallets: { scarmenta: st.wallets.scarmenta + s.change.scarmenta, others: st.wallets.others + s.change.others } }));
       setResult({ winner, bets: placed, ...s });
       setHistory((h) => [winner, ...h].slice(0, 30));
       setLastBets(placed);
@@ -77,6 +79,7 @@ export const RivalsTable = ({ onRound, lang }) => {
   return (
     <div data-testid="demo-rivals-table">
       <RivalsWallets wallets={wallets} />
+      <HedgeShare totals={state.totals} />
       <div className="flex items-center justify-center gap-6 rounded-3xl bg-[radial-gradient(ellipse_at_center,#14532d_0%,#052e16_70%)] px-4 py-8 sm:gap-16">
         <div className="flex flex-col items-center gap-3"><span className="rounded-md bg-sky-600 px-3 py-0.5 text-xs font-bold tracking-wide text-white">OTHERS</span><PlayingCard card={cards.others} testId="demo-card-rivals" /></div>
         <div className="w-40 text-center sm:w-56">

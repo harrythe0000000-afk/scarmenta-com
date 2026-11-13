@@ -175,3 +175,71 @@ export async function renderStreakImage({ streak, game, code, link }) {
   ctx.fillText(shown.length > 70 ? `…${shown.slice(-67)}` : shown, 120, 1170);
   return new Promise((res) => c.toBlob(res, "image/png"));
 }
+
+const inrFmt = (n) => `₹${Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+export async function renderHedgeImage({ net, othersProfit, creditCost, rounds, othersWins, code, link }) {
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#07050d";
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W / 2, 460, 40, W / 2, 460, 720);
+  glow.addColorStop(0, "rgba(16,185,129,0.35)");
+  glow.addColorStop(1, "rgba(16,185,129,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const logo = await loadImg("/scarmenta-logo.png");
+  if (logo) ctx.drawImage(logo, 80, 70, 90, 90);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 52px Georgia, serif";
+  ctx.fillText("Scarmenta", 190, 135);
+  ctx.fillStyle = "#F2B94B";
+  ctx.font = "600 26px sans-serif";
+  ctx.fillText("SCARMENTA VS OTHERS · DEMO PRACTICE", 80, 250);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "500 30px sans-serif";
+  ctx.fillText("My total net profit", 80, 340);
+  ctx.fillStyle = "#6ee7b7";
+  ctx.font = "800 130px sans-serif";
+  ctx.fillText(`${net < 0 ? "−" : "+"}${inrFmt(net)}`, 80, 480);
+  const rows = [["Profit on Others", `+${inrFmt(othersProfit)}`, "#7dd3fc"], ["Scarmenta credits cost", `−${inrFmt(creditCost)}`, "#f0abfc"],
+    ["Rounds won / played", `${othersWins} / ${rounds}`, "#fff"]];
+  rows.forEach(([l, v, col], i) => {
+    const y = 590 + i * 95;
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.beginPath();
+    ctx.roundRect(80, y - 58, W - 160, 80, 20);
+    ctx.fill();
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "500 32px sans-serif";
+    ctx.fillText(l, 115, y);
+    ctx.fillStyle = col;
+    ctx.font = "700 40px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(v, W - 115, y);
+    ctx.textAlign = "left";
+  });
+  ctx.fillStyle = "rgba(16,185,129,0.12)";
+  ctx.strokeStyle = "rgba(16,185,129,0.5)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(80, 940, W - 160, 210, 28);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "500 30px sans-serif";
+  ctx.fillText("Join with my referral code", 120, 1010);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 60px monospace";
+  ctx.fillText(code || "—", 120, 1070);
+  ctx.fillStyle = "#6ee7b7";
+  ctx.font = "500 24px sans-serif";
+  const shown = link.replace(/^https?:\/\//, "");
+  ctx.fillText(shown.length > 70 ? `…${shown.slice(-67)}` : shown, 120, 1120);
+  ctx.fillStyle = "#64748b";
+  ctx.font = "400 22px sans-serif";
+  wrap(ctx, "Demo practice with free play money. Not real winnings. Real game results are never guaranteed. Credits cannot be withdrawn.", 80, 1220, W - 160, 32);
+  return new Promise((res) => c.toBlob(res, "image/png"));
+}

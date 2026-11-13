@@ -169,3 +169,4 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Two demo wallets (Scarmenta credits 5000, Others ₹5000) in localStorage scarmenta_demo_rivals; refill via WhatsApp referral share or Deposit
 - Bigger-bet side loses exactly 3 of every 5 rounds (lib/rivalsEngine.js); Repeat/Double bet; tie removed
 - Result: Others win shows profit, credit cost (bet/promo_multiplier) and net; disclaimer states this table follows a practice pattern
+- 2026-11-13: Hedge share card: totals (rounds, othersWins, othersProfit, creditCost, net) persisted in rivals state; 'Total net profit' bar + WhatsApp image (renderHedgeImage) with referral code, only when net > 0

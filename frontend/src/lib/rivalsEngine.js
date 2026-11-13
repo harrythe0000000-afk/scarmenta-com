@@ -14,13 +14,24 @@ const shuffle = (a) => {
 };
 const newSchedule = () => shuffle([...Array(HEAVY_LOSES).fill(true), ...Array(BLOCK - HEAVY_LOSES).fill(false)]);
 
+export const EMPTY_TOTALS = { rounds: 0, othersWins: 0, othersProfit: 0, creditCost: 0, net: 0 };
+
 export const loadState = () => {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (s?.wallets && Array.isArray(s.schedule)) return s;
+    if (s?.wallets && Array.isArray(s.schedule)) return { totals: { ...EMPTY_TOTALS }, ...s };
   } catch { /* ignore */ }
-  return { wallets: { ...START }, schedule: newSchedule() };
+  return { wallets: { ...START }, schedule: newSchedule(), totals: { ...EMPTY_TOTALS } };
 };
+
+const r2 = (n) => Math.round(n * 100) / 100;
+export const addTotals = (t, bets, winner, s) => ({
+  rounds: t.rounds + 1,
+  othersWins: t.othersWins + (winner === "others" && bets.others ? 1 : 0),
+  othersProfit: r2(t.othersProfit + Math.max(0, s.change.others)),
+  creditCost: r2(t.creditCost + s.creditCost),
+  net: r2(t.net + s.net),
+});
 export const saveState = (s) => localStorage.setItem(KEY, JSON.stringify(s));
 
 // In every block of 5 rounds the side with the bigger bet loses 3 times.
