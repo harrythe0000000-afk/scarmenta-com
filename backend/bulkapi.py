@@ -1,5 +1,8 @@
 import base64
+import hashlib
 import hmac
+import io
+import csv
 import json
 import math
 import logging
@@ -11,9 +14,10 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
@@ -27,12 +31,32 @@ LAUNCH_URL = os.environ["BULKAPI_BASE_URL"].rstrip("/") + "/launch_game"
 DEFAULT_RATE = 95.0
 
 
+_FERNET = Fernet(base64.urlsafe_b64encode(hashlib.sha256(os.environ["JWT_SECRET"].encode()).digest()))
+_CACHE = {"at": 0.0, "token": "", "secret": "", "source": "none"}
+
+
+async def _ensure() -> None:
+    if time.time() - _CACHE["at"] < 30:
+        return
+    doc = await db.settings.find_one({"key": "bulkapi_creds"}, {"_id": 0}) or {}
+    dec = lambda v: _FERNET.decrypt(v.encode()).decode() if v else ""
+    token, secret = dec(doc.get("token_enc")), dec(doc.get("secret_enc"))
+    src = "admin panel" if token or secret else "server"
+    _CACHE.update(at=time.time(), source=src,
+                  token=token or os.environ.get("BULKAPI_API_TOKEN", "").strip(),
+                  secret=secret or os.environ.get("BULKAPI_SECRET_KEY", "").strip())
+
+
 def _token() -> str:
-    return os.environ.get("BULKAPI_API_TOKEN", "").strip()
+    return _CACHE["token"]
 
 
 def _secret() -> bytes:
-    return os.environ.get("BULKAPI_SECRET_KEY", "").strip().encode()
+    return _CACHE["secret"].encode()
+
+
+def _mask(v: str) -> str:
+    return f"••••{v[-4:]}" if len(v) > 4 else ("••••" if v else "")
 
 
 def encrypt_payload(data: dict) -> str:
@@ -147,6 +171,7 @@ async def _fail(user: dict, game: Optional[dict], code: int, reason: str):
 async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
     if user["role"] != "user":
         raise HTTPException(status_code=403, detail="Only players can open live games")
+    await _ensure()
     game = await db.live_games.find_one({"id": body.game_id, "active": True, "deleted": {"$ne": True}}, {"_id": 0})
     if not game:
         await _fail(user, None, 404, "Game not available")
@@ -195,6 +220,7 @@ async def handle_callback(request: Request):
         form = await _read_form(request)
     except Exception:
         return await _log_cb(request, form, "unreadable body", 400)
+    await _ensure()
     allowed = [ip.strip() for ip in os.environ.get("BULKAPI_CALLBACK_IPS", "").split(",") if ip.strip()]
     if allowed and client_ip(request) not in allowed:
         return await _log_cb(request, form, "ip not whitelisted", 403)
@@ -286,7 +312,9 @@ async def _reachable() -> bool:
 
 @router.get("/admin/live/status")
 async def live_status(_: dict = Depends(require_staff)):
-    return {"reachable": await _reachable(), "failed_callbacks": await db.live_callbacks.count_documents({"failed": True}),
+    await _ensure()
+    return {"source": _CACHE["source"], "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]),
+            "reachable": await _reachable(), "failed_callbacks": await db.live_callbacks.count_documents({"failed": True}),
             "unsettled": await db.live_rounds.count_documents({"settled": False}),
             "token_set": bool(_token()), "secret_set": bool(_secret()), "secret_bytes": len(_secret()),
             "launch_url": LAUNCH_URL, "ip_whitelist": bool(os.environ.get("BULKAPI_CALLBACK_IPS")),
@@ -299,6 +327,7 @@ class TestIn(BaseModel):
 
 @router.post("/admin/live/test")
 async def test_launch(body: TestIn, _: dict = Depends(require_admin)):
+    await _ensure()
     if not _token() or not _secret():
         raise HTTPException(status_code=400, detail="API token or secret key is missing")
     url = build_launch_url("9000000000", 100.0, body.game_uid.strip())
@@ -361,3 +390,80 @@ async def live_players(_: dict = Depends(require_staff)):
 @router.get("/admin/live/callbacks")
 async def live_callbacks(failed: bool = False, _: dict = Depends(require_staff)):
     return await db.live_callbacks.find({"failed": True} if failed else {}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+class CredsIn(BaseModel):
+    api_token: Optional[str] = Field(default=None, max_length=300)
+    secret_key: Optional[str] = Field(default=None, max_length=300)
+
+
+@router.put("/admin/live/credentials")
+async def save_credentials(body: CredsIn, admin: dict = Depends(require_admin)):
+    token, secret = (body.api_token or "").strip(), (body.secret_key or "").strip()
+    if not token and not secret:
+        raise HTTPException(status_code=400, detail="Enter the API Token, the Secret Key or both")
+    if token.lower().startswith(("http://", "https://", "www.")):
+        raise HTTPException(status_code=400, detail="This looks like a website link, not the API Token. Copy the API Token field from the BULKAPI portal.")
+    upd = {"updated_by": admin["email"], "updated_at": now_iso()}
+    if token:
+        upd["token_enc"] = _FERNET.encrypt(token.encode()).decode()
+    if secret:
+        upd["secret_enc"] = _FERNET.encrypt(secret.encode()).decode()
+    await db.settings.update_one({"key": "bulkapi_creds"}, {"$set": upd}, upsert=True)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "bulkapi_credentials_updated", "by": admin["email"],
+                                    "fields": [k for k in ("token", "secret") if locals()[k]], "created_at": now_iso()})
+    _CACHE["at"] = 0.0
+    await _ensure()
+    warn = "" if not secret or len(secret.encode()) == 32 else f"Secret Key has {len(secret.encode())} characters; BULKAPI keys are normally 32."
+    return {"ok": True, "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]), "warning": warn}
+
+
+HEADERS = {"name": ("name", "game", "game name", "game_name", "title"), "provider": ("provider", "vendor", "brand"),
+           "game_uid": ("game_uid", "uid", "game uid", "game id", "game_id", "gameuid", "code", "game code")}
+
+
+def _rows(filename: str, data: bytes) -> list:
+    if filename.lower().endswith((".xlsx", ".xlsm")):
+        import openpyxl
+        ws = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True).active
+        return [["" if c is None else str(c).strip() for c in r] for r in ws.iter_rows(values_only=True)]
+    text = data.decode("utf-8-sig", errors="replace")
+    return [[c.strip() for c in r] for r in csv.reader(io.StringIO(text))]
+
+
+@router.post("/admin/live/games/import")
+async def import_games(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    name = file.filename or ""
+    if not name.lower().endswith((".csv", ".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Upload a .csv or .xlsx file")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File is larger than 5 MB")
+    try:
+        rows = [r for r in _rows(name, data) if any(r)]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not read this file")
+    if len(rows) < 2:
+        raise HTTPException(status_code=400, detail="The file has no game rows")
+    head = [h.lower().strip() for h in rows[0]]
+    col = {k: next((i for i, h in enumerate(head) if h in alts), None) for k, alts in HEADERS.items()}
+    if col["name"] is None or col["game_uid"] is None:
+        raise HTTPException(status_code=400, detail="First row must have column names: name, provider, game_uid")
+    existing = {g["game_uid"] for g in await db.live_games.find({"deleted": {"$ne": True}}, {"_id": 0, "game_uid": 1}).to_list(20000)}
+    added, skipped, errors, docs = 0, 0, [], []
+    for n, r in enumerate(rows[1:], start=2):
+        get = lambda k: (r[col[k]] if col[k] is not None and col[k] < len(r) else "").strip()
+        gname, uid, prov = get("name"), get("game_uid"), get("provider") or "Other"
+        if len(gname) < 2 or not uid or len(uid) > 80 or len(gname) > 80:
+            errors.append(f"Row {n}: missing or too long name / game_uid")
+            continue
+        if uid in existing:
+            skipped += 1
+            continue
+        existing.add(uid)
+        docs.append({"id": new_id(), "name": gname, "provider": prov[:40], "game_uid": uid, "image_id": None, "active": True,
+                     "created_by": admin["email"], "created_at": now_iso(), "deleted": False})
+        added += 1
+    if docs:
+        await db.live_games.insert_many(docs)
+    return {"added": added, "skipped": skipped, "errors": errors[:50], "error_count": len(errors)}

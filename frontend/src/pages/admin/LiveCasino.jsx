@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, Plus, Trash2, Upload, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -54,6 +54,86 @@ const StatusCard = ({ data }) => {
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+const CredsCard = ({ data, reload }) => {
+  const [f, setF] = useState({ api_token: "", secret_key: "" });
+  const [show, setShow] = useState(false);
+  if (!data) return null;
+  const save = async (e) => {
+    e.preventDefault();
+    try {
+      const { data: r } = await api.put("/admin/live/credentials", f);
+      toast.success("BULKAPI keys saved");
+      if (r.warning) toast.warning(r.warning);
+      setF({ api_token: "", secret_key: "" });
+      reload();
+    } catch (err) {
+      toast.error(formatApiError(err));
+    }
+  };
+  const field = (k, label, mask, ph) => (
+    <div className="space-y-1">
+      <p className="text-xs text-slate-400">{label} <span className="font-mono text-slate-500" data-testid={`live-creds-${k}-mask`}>{mask ? `saved ${mask}` : "not saved"}</span></p>
+      <Input type={show ? "text" : "password"} autoComplete="off" placeholder={ph} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-testid={`live-creds-${k}-input`} className="border-purple-500/20 bg-black/40 font-mono" />
+    </div>
+  );
+  return (
+    <form onSubmit={save} className="card-lux space-y-3 p-6" data-testid="live-creds-form">
+      <p className="label-eyebrow">BULKAPI keys</p>
+      <p className="text-xs text-slate-500">Copy these two fields from your BULKAPI portal. One Token + Secret Key opens every game. Leave a box empty to keep the saved value.</p>
+      {field("api_token", "API Token", data.token_mask, "API Token from the portal")}
+      {field("secret_key", "Secret Key", data.secret_mask, "Secret Key (usually 32 characters)")}
+      {f.secret_key && <p className={`text-xs ${f.secret_key.trim().length === 32 ? "text-emerald-300" : "text-amber-300"}`} data-testid="live-creds-secret-length">{f.secret_key.trim().length}/32 characters</p>}
+      <label className="flex items-center gap-2 text-xs text-slate-400"><Switch checked={show} onCheckedChange={setShow} data-testid="live-creds-show-toggle" /> Show what I type</label>
+      <Button data-testid="live-creds-save" className="w-full rounded-full bg-purple-600 hover:bg-purple-500">Save keys</Button>
+    </form>
+  );
+};
+
+const TEMPLATE = "name,provider,game_uid\nLightning Roulette,Evolution,PUT_GAME_UID_HERE\n";
+
+const ImportCard = ({ onDone }) => {
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const upload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post("/admin/live/games/import", fd);
+      setRes(data);
+      toast.success(`${data.added} games added`);
+      onDone();
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const template = `data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE)}`;
+  return (
+    <div className="card-lux space-y-3 p-6" data-testid="live-import-card">
+      <p className="label-eyebrow">Add many games (Excel / CSV)</p>
+      <p className="text-xs text-slate-500">First row: <code className="text-purple-200">name, provider, game_uid</code>. Games already in the list are skipped.</p>
+      <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-full border border-dashed border-purple-500/40 px-4 py-3 text-sm text-purple-200 transition-colors hover:bg-purple-500/10 ${busy ? "opacity-50" : ""}`}>
+        <Upload className="h-4 w-4" /> {busy ? "Uploading…" : "Choose .xlsx or .csv file"}
+        <input type="file" accept=".csv,.xlsx,.xlsm" className="hidden" disabled={busy} onChange={upload} data-testid="live-import-input" />
+      </label>
+      <a href={template} download="bulkapi-games-template.csv" className="block text-center text-xs text-slate-400 underline hover:text-white" data-testid="live-import-template">Download sample file</a>
+      {res && (
+        <div className="rounded-lg border border-purple-500/20 bg-black/40 p-3 text-xs" data-testid="live-import-result">
+          <p className="text-emerald-300">{res.added} added</p>
+          <p className="text-slate-400">{res.skipped} already in list</p>
+          {res.error_count > 0 && <p className="text-red-300">{res.error_count} rows had problems</p>}
+          {res.errors.map((er) => <p key={er} className="text-[10px] text-slate-500">{er}</p>)}
+        </div>
+      )}
     </div>
   );
 };
@@ -205,8 +285,10 @@ export default function AdminLiveCasino() {
           <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
             <div className="space-y-6">
               <StatusCard data={status.data} />
+              {canEdit && <CredsCard data={status.data} reload={status.reload} />}
               {canEdit && <RateCard data={status.data} reload={status.reload} />}
               {canEdit && <TestCard />}
+              {canEdit && <ImportCard onDone={reload} />}
               {canEdit && <AddGame onDone={reload} />}
             </div>
             <div className="space-y-6">
