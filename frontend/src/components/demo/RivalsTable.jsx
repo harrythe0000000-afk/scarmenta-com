@@ -79,7 +79,7 @@ export const RivalsTable = ({ onRound, lang }) => {
       <RivalsWallets wallets={wallets} />
       <div className="flex items-center justify-center gap-6 rounded-3xl bg-[radial-gradient(ellipse_at_center,#14532d_0%,#052e16_70%)] px-4 py-8 sm:gap-16">
         <div className="flex flex-col items-center gap-3"><span className="rounded-md bg-sky-600 px-3 py-0.5 text-xs font-bold tracking-wide text-white">OTHERS</span><PlayingCard card={cards.others} testId="demo-card-rivals" /></div>
-        <div className="w-44 text-center">
+        <div className="w-40 text-center sm:w-56">
           <p className="font-display text-2xl font-bold text-white/80">VS</p>
           <RivalsResult result={result} mult={mult} />
         </div>

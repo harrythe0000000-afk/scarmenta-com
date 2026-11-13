@@ -164,3 +164,8 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - 2026-11-13: GET /api/live/popular (all-time round counts, top 5 active games); 'Most played' row with rank badges on player page, hidden while filtering
 - 2026-11-13: Favourites: users.live_favourites; GET /api/live/favourites, PUT /api/live/favourites/{id} {favourite}; heart on each tile + 'Favourites (n)' filter button
 - 2026-11-13: Recently played row (GET /api/live/recent: user's last 5 distinct launched active games) above Most played, hidden while filtering
+
+## 2026-11-13 Scarmenta vs Others demo rework (iteration_22, frontend only)
+- Two demo wallets (Scarmenta credits 5000, Others ₹5000) in localStorage scarmenta_demo_rivals; refill via WhatsApp referral share or Deposit
+- Bigger-bet side loses exactly 3 of every 5 rounds (lib/rivalsEngine.js); Repeat/Double bet; tie removed
+- Result: Others win shows profit, credit cost (bet/promo_multiplier) and net; disclaimer states this table follows a practice pattern

@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend-only test of the 'Scarmenta vs Others' demo game rework (two wallets, 3-of-5 heavy-side-loses pattern, Repeat/Double, refill dialog, persistence) plus regression checks on Andar Bahar and Teen Patti. Logged in as demo@aetheria.io and ran 3 Playwright runs on desktop 1920x1080, with one mobile 390x844 screenshot. Every requested feature works as specified, and no bugs that block use were found.",
+  "verified": [
+    "Tab demo-tab-rivals is labelled 'Scarmenta vs Others'. With a fresh state the wallets show '5,000 cr' and '₹5,000'. demo-balance is hidden on rivals and shown on AB/TP tabs. There is no tie spot.",
+    "Chips show 50/100/500/1K with no $ prefix. Badges show '1,000 cr' and '₹500'.",
+    "10 rounds of S1000+O500 from a fresh state gave the sequence O,O,S,S,O | S,O,S,O,O. Scarmenta (the bigger bet) lost exactly 3 rounds in each block of 5.",
+    "Math with multiplier 5 (from /api/public/config): when Others wins it shows 'Others +₹500 profit', '− ₹200 paid for 1,000 cr (1/5)', 'Net profit ₹300'. When Scarmenta wins it shows 'Scarmenta +1,000 cr', 'Others −₹500', 'Net loss ₹300', with no cost line. Wallet deltas were correct in every round.",
+    "A single-side bet (Others ₹100 only) shows only the Others line, with no net or cost line, and the wallet changes correctly.",
+    "Repeat re-places the last bets (used for rounds 2-10). Double turns current 500cr/₹100 into 1,000cr/₹200, and with no bets placed it doubles the last bet (₹100 to ₹200). Both buttons are disabled at first. Clear works.",
+    "A bet that does not fit opens rivals-refill-dialog: on the 4th 1K click with a 3,000 cr wallet, and on the 6th 1K click on Others with ₹5,000. Share & refill opens api.whatsapp.com with the referral code and link, closes the dialog and sets both wallets to 5,000. Deposit goes to /app/deposits.",
+    "Wallets loaded from localStorage after reload (3,000 cr / ₹6,000).",
+    "Regression: Andar Bahar ($ chips, $1,000 balance, +$90 win) and Teen Patti (+$50) play normally. Reset sets the $ balance back to $1,000 and leaves the rivals wallets alone."
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Refill dialog", "issues": ["The title always says 'Demo wallet is empty', even when the wallet is not empty and the bet just doesn't fit (e.g. 3,000 cr left). Suggested title: 'Not enough demo balance'.", "After Share & refill, the bet that triggered the dialog is not placed; the user has to click again. Minor UX point."]},
+      {"screen": "Rivals result block", "issues": ["The result lines are text-xs in a w-44 column between the cards and are hard to read on desktop. They may get cramped on mobile (390px) when all 4 lines show."]},
+      {"screen": "Portfolio stats", "issues": ["Profit/Loss and Biggest win stay at $0.00 for rivals rounds (separate:true), while Rounds/Wins/Losses count them. This looks intended but may confuse users."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: change the refill dialog title so it fits the 'bet exceeds wallet' case",
+    "Optional: after a refill, automatically place the bet that triggered the dialog",
+    "Optional: make the rivals result text larger"
+  ],
+  "critical_code_review_comments": [
+    "Share & refill refills the wallets as soon as window.open is called, whether or not the user actually shares. This is acceptable for a demo but cannot be verified.",
+    "If both bets are equal, pickWinner picks the heavy side at random but still uses a schedule slot. This is fine and matches the spec."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None. Only browser localStorage in the test contexts was changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The demo page is at /app/demo-game. Rivals state is in localStorage key scarmenta_demo_rivals {schedule:[bool x5], wallets}; true = the bigger side loses. The login submit testid is login-submit-button. AB/TP use BetSpot ids andar/bahar and tp-scarmenta/tp-rivals, with deal buttons demo-ab-deal-button and demo-tp-deal-button."
+}

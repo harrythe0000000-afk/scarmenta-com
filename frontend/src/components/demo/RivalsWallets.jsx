@@ -43,7 +43,7 @@ export const RefillDialog = ({ open, onClose, onRefill }) => {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent data-testid="rivals-refill-dialog" className="max-w-md border-purple-500/20 bg-[#0b0816] text-slate-200">
-        <DialogTitle className="font-display text-2xl text-white">Demo wallet is empty</DialogTitle>
+        <DialogTitle className="font-display text-2xl text-white">Not enough demo balance</DialogTitle>
         <DialogDescription className="text-sm text-slate-400">
           Share your referral link on WhatsApp to refill both demo wallets (5,000 credits + ₹5,000), or make a real deposit to get 5X credits.
         </DialogDescription>
@@ -62,7 +62,7 @@ export const RivalsResult = ({ result, mult }) => {
   const sc = bets.scarmenta || 0;
   const ot = bets.others || 0;
   return (
-    <div className="min-h-20 space-y-0.5 text-center text-xs" data-testid="demo-result">
+    <div className="min-h-20 space-y-0.5 text-center text-xs sm:text-sm" data-testid="demo-result">
       <p className="text-sm font-semibold text-emerald-300">{winner === "scarmenta" ? "Scarmenta wins" : "Others win"}</p>
       {sc > 0 && <p className={change.scarmenta >= 0 ? "text-fuchsia-200" : "text-red-300"} data-testid="rivals-result-scarmenta">Scarmenta {change.scarmenta >= 0 ? "+" : "−"}{cr(sc)}</p>}
       {ot > 0 && <p className={change.others >= 0 ? "text-sky-200" : "text-red-300"} data-testid="rivals-result-others">Others {change.others >= 0 ? "+" : "−"}{inr(ot)}{winner === "others" ? " profit" : ""}</p>}
