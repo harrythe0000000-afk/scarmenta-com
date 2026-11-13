@@ -65,7 +65,11 @@ INDEXES: dict[str, list[IndexModel]] = {
     "email_tokens": [IndexModel([("token", ASCENDING)], name="token", unique=True),
                      IndexModel([("expires_at", ASCENDING)], name="ttl", expireAfterSeconds=0)],
     "chat_messages": [IndexModel([("user_id", ASCENDING), ("session_id", ASCENDING), ("created_at", ASCENDING)], name="user_session")],
-    "live_rounds": [IndexModel([("game_round", ASCENDING)], name="game_round", unique=True)],
+    "live_rounds": [IndexModel([("game_round", ASCENDING)], name="game_round", unique=True),
+                    IndexModel([("user_id", ASCENDING)], name="user_id")],
+    "live_sessions": [IndexModel([("created_at", DESCENDING)], name="created_desc")],
+    "live_callbacks": [IndexModel([("created_at", DESCENDING)], name="created_desc"),
+                       IndexModel([("failed", ASCENDING)], name="failed")],
     "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
                                  name="banner_user_type", unique=True)],
 }

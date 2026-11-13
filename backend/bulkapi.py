@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import time
 from typing import Optional
@@ -21,7 +22,7 @@ from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, requ
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
-LAUNCH_URL = os.environ["BULKAPI_BASE_URL"].rstrip("/") + "/launch_game/"
+LAUNCH_URL = os.environ["BULKAPI_BASE_URL"].rstrip("/") + "/launch_game"
 DEFAULT_RATE = 95.0
 
 
@@ -126,24 +127,37 @@ class LaunchIn(BaseModel):
     game_id: str
 
 
+async def _log_launch(user: dict, game: Optional[dict], status: str, reason: str = "", **extra) -> None:
+    await db.live_sessions.insert_one({"id": new_id(), "user_id": user["id"], "user_email": user.get("email"),
+                                       "player_id": user.get("bulk_player_id"), "game_id": (game or {}).get("id"),
+                                       "game_uid": (game or {}).get("game_uid"), "game_name": (game or {}).get("name"),
+                                       "provider": (game or {}).get("provider"), "status": status, "reason": reason,
+                                       "created_at": now_iso(), **extra})
+
+
+async def _fail(user: dict, game: Optional[dict], code: int, reason: str):
+    await _log_launch(user, game, "failed", reason)
+    raise HTTPException(status_code=code, detail=reason)
+
+
 @router.post("/live/launch")
 async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
     if user["role"] != "user":
         raise HTTPException(status_code=403, detail="Only players can open live games")
-    if not _token() or not _secret():
-        raise HTTPException(status_code=503, detail="Live casino is not set up yet. Please contact support.")
     game = await db.live_games.find_one({"id": body.game_id, "active": True, "deleted": {"$ne": True}}, {"_id": 0})
     if not game:
-        raise HTTPException(status_code=404, detail="Game not available")
-    balance = float(user.get("promo_balance", 0))
+        await _fail(user, None, 404, "Game not available")
+    if not _token() or not _secret():
+        await _fail(user, game, 503, "Live casino is not set up yet. Please contact support.")
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "promo_balance": 1, "bulk_player_id": 1})
+    balance = float(fresh.get("promo_balance", 0))
     if balance <= 0:
-        raise HTTPException(status_code=400, detail="Your credit balance is empty. Make a deposit to play.")
-    rate, pid = await live_rate(), await player_id(user)
+        await _fail(user, game, 400, "Your credit balance is empty. Make a deposit to play.")
+    rate = await live_rate()
+    pid = await player_id({**user, **fresh})
     wallet = round(balance * rate, 2)
     url = build_launch_url(pid, wallet, game["game_uid"])
-    await db.live_sessions.insert_one({"id": new_id(), "user_id": user["id"], "player_id": pid, "game_id": game["id"],
-                                       "game_uid": game["game_uid"], "provider": game["provider"], "wallet_inr": wallet,
-                                       "rate": rate, "created_at": now_iso()})
+    await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate)
     return {"url": url, "wallet_inr": wallet}
 
 
@@ -161,54 +175,84 @@ async def _read_form(request: Request) -> dict:
     return {k: str(v) for k, v in (await request.form()).items()}
 
 
-@router.post("/bulkapi/callback", response_class=PlainTextResponse)
-async def callback(request: Request):
+async def _log_cb(request: Request, form: dict, result: str, code: int) -> PlainTextResponse:
+    await db.live_callbacks.insert_one({"id": new_id(), "ip": client_ip(request), "path": request.url.path,
+                                        "game_round": form.get("game_round"), "mobile": form.get("mobile"),
+                                        "fields": {k: v for k, v in form.items() if k != "token"}, "result": result,
+                                        "http_status": code, "failed": code != 200, "created_at": now_iso()})
+    return PlainTextResponse("ok" if code == 200 else result, status_code=code)
+
+
+async def handle_callback(request: Request):
+    form = {}
+    try:
+        form = await _read_form(request)
+    except Exception:
+        return await _log_cb(request, form, "unreadable body", 400)
     allowed = [ip.strip() for ip in os.environ.get("BULKAPI_CALLBACK_IPS", "").split(",") if ip.strip()]
-    ip = client_ip(request)
-    if allowed and ip not in allowed:
-        logger.warning(f"BULKAPI callback from non-whitelisted IP {ip}")
-        return PlainTextResponse("forbidden", status_code=403)
-    form = await _read_form(request)
+    if allowed and client_ip(request) not in allowed:
+        return await _log_cb(request, form, "ip not whitelisted", 403)
     if not _token() or not hmac.compare_digest(form.get("token", "").strip(), _token()):
-        logger.warning(f"BULKAPI callback with bad token from {ip}")
-        return PlainTextResponse("invalid token", status_code=403)
+        return await _log_cb(request, form, "invalid token", 403)
     rnd, mobile = form.get("game_round", "").strip(), form.get("mobile", "").strip()
     if not rnd or not mobile:
-        return PlainTextResponse("missing fields", status_code=400)
-    bet, win = _f(form, "bet_amount"), _f(form, "win_amount")
-    user = await db.users.find_one({"bulk_player_id": mobile}, {"_id": 0, "id": 1})
+        return await _log_cb(request, form, "missing game_round or mobile", 400)
+    try:
+        bet, win = _f(form, "bet_amount"), _f(form, "win_amount")
+    except HTTPException as e:
+        return await _log_cb(request, form, e.detail, 400)
+    if bet < 0 or win < 0:
+        return await _log_cb(request, form, "negative amount", 400)
+    user = await db.users.find_one({"bulk_player_id": mobile}, {"_id": 0, "id": 1, "email": 1})
     if not user:
-        logger.warning(f"BULKAPI callback for unknown player {mobile}")
-        return PlainTextResponse("unknown player", status_code=404)
+        return await _log_cb(request, form, "unknown player", 404)
     game = await db.live_games.find_one({"game_uid": form.get("game_uid", "")}, {"_id": 0, "provider": 1, "name": 1})
     prev = await db.live_rounds.find_one({"game_round": rnd}, {"_id": 0})
     rate = prev["rate"] if prev else await live_rate()
     change_usd = round((win - bet) / rate, 4)
     delta = round(change_usd - (prev["applied_usd"] if prev else 0), 4)
     raw = {k: v for k, v in form.items() if k != "token"}
-    doc = {"game_round": rnd, "user_id": user["id"], "player_id": mobile, "game_uid": raw.get("game_uid"),
-           "provider": (game or {}).get("provider", "Unknown"), "game_name": (game or {}).get("name"),
-           "bet_inr": bet, "win_inr": win, "rate": rate, "currency": raw.get("currency_code") or "INR",
-           "applied_usd": change_usd, "raw": raw, "updated_at": now_iso()}
+    doc = {"game_round": rnd, "user_id": user["id"], "user_email": user.get("email"), "player_id": mobile,
+           "game_uid": raw.get("game_uid"), "provider": (game or {}).get("provider", "Unknown"),
+           "game_name": (game or {}).get("name"), "bet_inr": bet, "win_inr": win, "net_inr": round(win - bet, 2),
+           "wallet_before": raw.get("wallet_before"), "wallet_after": raw.get("wallet_after"), "change": raw.get("change"),
+           "currency": raw.get("currency_code") or "INR", "provider_ts": raw.get("timestamp"), "rate": rate,
+           "applied_usd": change_usd, "settled": False, "raw": raw, "updated_at": now_iso(),
+           "callbacks": (prev or {}).get("callbacks", 0) + 1}
     if prev:
         r = await db.live_rounds.update_one({"game_round": rnd, "applied_usd": prev["applied_usd"]}, {"$set": doc})
         if not r.modified_count:
-            return PlainTextResponse("ok")
+            return await _log_cb(request, form, "duplicate (in progress)", 200)
     else:
         try:
             await db.live_rounds.insert_one({**doc, "created_at": now_iso()})
         except DuplicateKeyError:
-            return PlainTextResponse("ok")
-    if delta:
-        u = await db.users.find_one_and_update({"id": user["id"]}, {"$inc": {"promo_balance": delta}},
-                                               projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
-        if u["promo_balance"] < 0:
-            logger.error(f"Live round {rnd} left user {u['id']} negative: {u['promo_balance']}")
-        await db.transactions.insert_one(make_tx(
-            u, "live_round", "credit", delta,
-            f"Live casino · {doc['game_name'] or doc['game_uid']} · bet ₹{bet:,.2f} win ₹{win:,.2f}",
-            f"LIVE-{rnd[:20]}", u["promo_balance"]))
-    return PlainTextResponse("ok")
+            return await _log_cb(request, form, "duplicate (ignored)", 200)
+    if not delta:
+        await db.live_rounds.update_one({"game_round": rnd}, {"$set": {"settled": True}})
+        return await _log_cb(request, form, "duplicate (no change)" if prev else "applied (zero change)", 200)
+    u = await db.users.find_one_and_update({"id": user["id"]}, {"$inc": {"promo_balance": delta}},
+                                           projection={"_id": 0, "password_hash": 0}, return_document=ReturnDocument.AFTER)
+    await db.transactions.insert_one(make_tx(
+        u, "live_round", "credit", delta,
+        f"Live casino · {doc['game_name'] or doc['game_uid']} · bet ₹{bet:,.2f} win ₹{win:,.2f}",
+        f"LIVE-{rnd[:20]}", u["promo_balance"]))
+    await db.live_rounds.update_one({"game_round": rnd}, {"$set": {"settled": True, "balance_after_usd": u["promo_balance"]}})
+    note = "updated" if prev else "applied"
+    if u["promo_balance"] < 0:
+        logger.error(f"Live round {rnd} left user {u['id']} negative: {u['promo_balance']}")
+        note += " (balance negative)"
+    return await _log_cb(request, form, f"{note} {delta:+.4f} USD", 200)
+
+
+@router.post("/bulkapi/callback", response_class=PlainTextResponse)
+async def callback(request: Request):
+    return await handle_callback(request)
+
+
+@router.post("/game_callback.php", response_class=PlainTextResponse)
+async def callback_php(request: Request):
+    return await handle_callback(request)
 
 
 # ---------- Admin ----------
@@ -223,9 +267,20 @@ async def set_rate(body: RateIn, admin: dict = Depends(require_admin)):
     return {"inr_rate": body.inr_rate}
 
 
+async def _reachable() -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=6, follow_redirects=False) as c:
+            await c.head(LAUNCH_URL)
+        return True
+    except httpx.HTTPError:
+        return False
+
+
 @router.get("/admin/live/status")
 async def live_status(_: dict = Depends(require_staff)):
-    return {"token_set": bool(_token()), "secret_set": bool(_secret()), "secret_bytes": len(_secret()),
+    return {"reachable": await _reachable(), "failed_callbacks": await db.live_callbacks.count_documents({"failed": True}),
+            "unsettled": await db.live_rounds.count_documents({"settled": False}),
+            "token_set": bool(_token()), "secret_set": bool(_secret()), "secret_bytes": len(_secret()),
             "launch_url": LAUNCH_URL, "ip_whitelist": bool(os.environ.get("BULKAPI_CALLBACK_IPS")),
             "inr_rate": await live_rate(), "rounds": await db.live_rounds.count_documents({})}
 
@@ -261,3 +316,40 @@ async def live_ggr(_: dict = Depends(require_staff)):
             "wins_inr": round(r["wins"], 2), "ggr_inr": round(r["bets"] - r["wins"], 2)} for r in rows]
     recent = await db.live_rounds.find({}, {"_id": 0, "raw": 0}).sort("updated_at", -1).to_list(50)
     return {"providers": out, "recent": recent}
+
+
+def _q(user: Optional[str]) -> dict:
+    return {"user_email": {"$regex": f"^{re.escape(user.strip())}", "$options": "i"}} if user and user.strip() else {}
+
+
+@router.get("/admin/live/sessions")
+async def live_sessions(user: Optional[str] = None, status: Optional[str] = None, _: dict = Depends(require_staff)):
+    q = {**_q(user), **({"status": status} if status in ("launched", "failed") else {})}
+    return await db.live_sessions.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@router.get("/admin/live/rounds")
+async def live_rounds(user: Optional[str] = None, result: Optional[str] = None, _: dict = Depends(require_staff)):
+    q = _q(user)
+    if result == "win":
+        q["net_inr"] = {"$gt": 0}
+    elif result == "loss":
+        q["net_inr"] = {"$lt": 0}
+    return await db.live_rounds.find(q, {"_id": 0, "raw": 0}).sort("updated_at", -1).to_list(200)
+
+
+@router.get("/admin/live/players")
+async def live_players(_: dict = Depends(require_staff)):
+    rows = await db.live_rounds.aggregate([
+        {"$group": {"_id": "$user_id", "email": {"$first": "$user_email"}, "player_id": {"$first": "$player_id"},
+                    "rounds": {"$sum": 1}, "bets": {"$sum": "$bet_inr"}, "wins": {"$sum": "$win_inr"},
+                    "net_usd": {"$sum": "$applied_usd"}, "last": {"$max": "$updated_at"}}},
+        {"$sort": {"bets": -1}}, {"$limit": 200}]).to_list(200)
+    return [{"user_id": r["_id"], "email": r["email"], "player_id": r["player_id"], "rounds": r["rounds"],
+             "bets_inr": round(r["bets"], 2), "wins_inr": round(r["wins"], 2), "ggr_inr": round(r["bets"] - r["wins"], 2),
+             "net_usd": round(r["net_usd"], 2), "last": r["last"]} for r in rows]
+
+
+@router.get("/admin/live/callbacks")
+async def live_callbacks(failed: bool = False, _: dict = Depends(require_staff)):
+    return await db.live_callbacks.find({"failed": True} if failed else {}, {"_id": 0}).sort("created_at", -1).to_list(200)

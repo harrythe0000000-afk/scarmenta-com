@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/StatCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CallbackLogs, LaunchHistory, PlayerReport, RoundHistory } from "@/components/LiveReports";
 import { ImagePicker } from "@/pages/admin/Popups";
 import { useAuth } from "@/context/AuthContext";
 import { api, API, formatApiError } from "@/lib/api";
@@ -15,7 +17,7 @@ import { fmtDate } from "@/lib/format";
 const PROVIDERS = ["Ezugi", "Evolution", "Microgaming", "Playtech", "Iconic21", "ORA Gaming", "Macro Gaming", "Other"];
 const EMPTY = { name: "", provider: "Evolution", game_uid: "", image_id: null };
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const CALLBACK = `${API}/bulkapi/callback`;
+const CALLBACKS = [`${API}/bulkapi/callback`, `${API}/game_callback.php`];
 
 const run = async (fn, msg, after) => {
   try {
@@ -41,12 +43,17 @@ const StatusCard = () => {
       <Check ok={data.secret_set && data.secret_bytes === 32} label={`Secret key saved (${data.secret_bytes}/32 characters)`} />
       <Check ok={data.inr_rate > 0} label={`INR rate $1 = ₹${data.inr_rate}`} />
       <Check ok={data.rounds > 0} label={`${data.rounds} game rounds received`} />
-      <div className="pt-2">
-        <p className="text-xs text-slate-500">Callback URL to set in the BULKAPI portal</p>
-        <div className="mt-1 flex items-center gap-2 rounded-lg border border-purple-500/20 bg-black/40 px-3 py-2">
-          <code className="flex-1 truncate text-xs text-purple-200" data-testid="live-callback-url">{CALLBACK}</code>
-          <button type="button" onClick={() => { navigator.clipboard.writeText(CALLBACK); toast.success("Copied"); }} data-testid="live-callback-copy"><Copy className="h-4 w-4 text-slate-400" /></button>
-        </div>
+      <Check ok={data.reachable} label={data.reachable ? `BULKAPI reachable (${data.launch_url})` : `BULKAPI not reachable (${data.launch_url})`} />
+      <Check ok={data.failed_callbacks === 0} label={`${data.failed_callbacks} failed callbacks`} />
+      <Check ok={data.unsettled === 0} label={`${data.unsettled} rounds waiting to settle`} />
+      <div className="space-y-2 pt-2">
+        <p className="text-xs text-slate-500">Callback URL to set in the BULKAPI portal (either works)</p>
+        {CALLBACKS.map((u, i) => (
+          <div key={u} className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-black/40 px-3 py-2">
+            <code className="flex-1 truncate text-xs text-purple-200" data-testid={`live-callback-url-${i}`}>{u}</code>
+            <button type="button" onClick={() => { navigator.clipboard.writeText(u); toast.success("Copied"); }} data-testid={`live-callback-copy-${i}`}><Copy className="h-4 w-4 text-slate-400" /></button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -187,18 +194,33 @@ export default function AdminLiveCasino() {
   return (
     <>
       <PageHeader eyebrow="BULKAPI" title="Live casino" desc="Manage live dealer games, check the BULKAPI connection and see GGR by provider." />
-      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-        <div className="space-y-6">
-          <StatusCard />
-          {canEdit && <RateCard />}
-          {canEdit && <TestCard />}
-          {canEdit && <AddGame onDone={reload} />}
-        </div>
-        <div className="space-y-6">
-          <Games games={data || []} canEdit={canEdit} reload={reload} />
-          <Ggr />
-        </div>
-      </div>
+      <Tabs defaultValue="setup" data-testid="live-tabs">
+        <TabsList className="mb-6 flex-wrap bg-black/40">
+          <TabsTrigger value="setup" data-testid="live-tab-setup">Setup & games</TabsTrigger>
+          <TabsTrigger value="launches" data-testid="live-tab-launches">Launch history</TabsTrigger>
+          <TabsTrigger value="rounds" data-testid="live-tab-rounds">Bets & wins</TabsTrigger>
+          <TabsTrigger value="players" data-testid="live-tab-players">Player report</TabsTrigger>
+          <TabsTrigger value="callbacks" data-testid="live-tab-callbacks">Callback logs</TabsTrigger>
+        </TabsList>
+        <TabsContent value="setup">
+          <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+            <div className="space-y-6">
+              <StatusCard />
+              {canEdit && <RateCard />}
+              {canEdit && <TestCard />}
+              {canEdit && <AddGame onDone={reload} />}
+            </div>
+            <div className="space-y-6">
+              <Games games={data || []} canEdit={canEdit} reload={reload} />
+              <Ggr />
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="launches"><LaunchHistory /></TabsContent>
+        <TabsContent value="rounds"><RoundHistory /></TabsContent>
+        <TabsContent value="players"><PlayerReport /></TabsContent>
+        <TabsContent value="callbacks"><CallbackLogs /></TabsContent>
+      </Tabs>
     </>
   );
 }
