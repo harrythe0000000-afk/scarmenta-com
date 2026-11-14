@@ -1,0 +1,44 @@
+{
+  "summary": "Tested the BULKAPI integration end to end (backend and frontend). Covered: config read from API_TOKEN/API_SECRET/API_BASE_URL with fallback to the BULKAPI_* names; the new live_providers module (seeding, CRUD, role checks, a test must pass before a provider can go live, failed test turns the provider off, player list filtered by enabled providers, launch blocked for disabled providers); GET /api/admin/live/server-ip; launch URL AES-256-ECB payload, decrypted and checked against the query; callbacks; and the Admin Live Casino UI (Whitelist card, Providers tab add/delete, staff read-only view, player empty state). The new code works as designed. Preview cannot actually launch games: API_BASE_URL=https://bulkapi.org has no DNS, the env token is a URL ending in .php, and the secret is 30 characters instead of 32. 4 older regression tests are now out of date because of the new provider gating.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "config (env)", "issue": "API_BASE_URL/BULKAPI_BASE_URL=https://bulkapi.org does not resolve (curl exit 6, getent finds nothing), while bulkapi.site resolves and /launch_game returns 301. As a result status.reachable=false, every provider test fails with 'Could not reach BULKAPI: ConnectError', and no provider can ever be turned on. Process env has no API_TOKEN/API_SECRET; the BULKAPI_API_TOKEN fallback is a 35-char URL ending '.php', and BULKAPI_SECRET_KEY is 30 bytes. These are config/user-side problems, not code bugs."},
+      {"endpoint": "_ensure() env fallback", "issue": "PUT /admin/live/credentials rejects tokens that look like URLs, but the env fallback is never checked the same way. Status shows 'API token saved' with a green check while the token is a URL. Show the same warning for env tokens."},
+      {"endpoint": "POST /api/admin/live/providers/{id}/test", "issue": "Any failed probe sets enabled=false, including network blips like a timeout or DNS failure. In production one flaky admin test hides a live provider from every player. Consider only auto-disabling when BULKAPI gives a real error reply (status != 0)."},
+      {"endpoint": "live_providers.seed_providers", "issue": "The 6 default providers are re-created on every startup, so an admin who deletes Evolution/Pragmatic etc. sees them come back after a restart or deploy."},
+      {"endpoint": "GET /api/admin/live/providers 'games' count vs DELETE", "issue": "The count only includes active games, but DELETE refuses if any non-deleted game exists (including inactive ones). The UI shows the trash icon when games=0 (only inactive games) and the delete then fails with a 400. Same mismatch for the Test button: it is disabled when there are 0 active games, but the backend would probe an inactive game."},
+      {"endpoint": "GET /api/admin/live/server-ip", "issue": "The domain 'scarmenta.com' is hard-coded; it should come from env (FRONTEND_URL). The IP really does change: preview returned 35.225.230.28 now, while PRD notes 34.170.12.145. This confirms the warning on the card."},
+      {"endpoint": "POST /api/admin/live/games/import", "issue": "Import silently creates providers (disabled) for any new vendor name, e.g. 'Other'. The old regression test test_live_credentials_import does not clean these up; I removed the 3 leftovers (Other, Playtech, Iconic21) from my run."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin > Live Casino > Providers", "issues": ["The Test button is disabled for providers with 0 games, but nothing explains why; add a tooltip like 'Add a game first'.", "The trash icon on seeded default providers is misleading, because they come back on restart."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_live_providers_central.py", "/app/test_reports/pytest/live_providers_central.xml"],
+  "action_items": [
+    "Update the outdated regression tests in tests/test_live_casino_bulkapi.py (test_launch_url, test_launch_zero_balance, test_player_games_hide_uid, test_reports). They assume 'Evolution' is enabled, but providers now start disabled and can only be enabled after a successful probe. Have the fixtures create a TEST_ provider and enable it in mongo, as test_live_providers_central.py does.",
+    "Fix test isolation: test_live_credentials_import deletes bulkapi_creds directly in mongo, so the backend keeps the old token in its 30s _CACHE. Running both files in parallel (xdist) makes the callback tests fail with 'invalid token'. Clear credentials through DELETE /api/admin/live/credentials (which resets the cache) or run these files with -n 0. The test should also clean up providers created by import.",
+    "Validate env token/secret in /admin/live/status: warn when the token looks like a URL or the secret is not 32 bytes.",
+    "Do not auto-disable a provider when the probe fails with a network error (status 0).",
+    "Respect admin deletions of default providers (e.g. a 'seeded' flag or soft-delete) instead of re-seeding on every startup.",
+    "Make the provider 'games' count match the delete/test rules (count non-deleted games).",
+    "User/config: set API_BASE_URL to a host that resolves (bulkapi.site resolves; bulkapi.org does not), and set real API_TOKEN/API_SECRET (32 chars)."
+  ],
+  "critical_code_review_comments": [
+    "bulkapi.py is 570 lines and growing (catalogue, launch, callback, admin reports, credentials, import). Consider splitting out the import and the reports.",
+    "LAUNCH_URL is computed at import time, so changing API_BASE_URL needs a backend restart. Fine, but worth documenting.",
+    "_CACHE is per process; with more than one uvicorn worker, saved credentials take up to 30s to reach the other workers.",
+    "Callback credits rounds even when the game's provider is disabled. This is correct for settlement and worth keeping."
+  ],
+  "updated_files": ["/app/backend/tests/test_live_providers_central.py"],
+  "success_rate": {"backend": "100% of the new test_live_providers_central.py (13/13); older test_live_casino_bulkapi.py 12/16, where all 4 failures are outdated tests (provider gating), not regressions", "frontend": "100%"},
+  "seed_data_creation": "None kept. TEST_ providers and games were created and then deleted. I removed 3 providers auto-created by the old import regression test in this run (Other, Playtech, Iconic21, created_by admin at 08:29). The demo balance is unchanged at 1039.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the live casino test files with -n 0 (serial). Export backend/.env (set -a; . ./.env) and set BULK_TOKEN=$BULKAPI_API_TOKEN before running pytest. All providers start disabled; the probe cannot pass in preview (bulkapi.org has no DNS), so tests must enable TEST_ providers directly in mongo. Admin Live Casino testids: live-server-ip-card/button, live-whitelist-ip/domain, live-tab-providers, live-provider-name-input, live-provider-add-button, live-provider-row-<pid>, live-provider-test-<pid>, live-provider-toggle-<pid>, live-provider-delete-<pid> (uses window.confirm)."
+}

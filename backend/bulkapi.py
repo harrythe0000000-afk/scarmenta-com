@@ -370,7 +370,8 @@ async def _reachable() -> bool:
 @router.get("/admin/live/status")
 async def live_status(_: dict = Depends(require_staff)):
     await _ensure()
-    return {"source": _CACHE["source"], "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]),
+    return {"source": _CACHE["source"], "token_is_url": _token().lower().startswith(("http://", "https://", "www.")),
+            "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]),
             "reachable": await _reachable(), "failed_callbacks": await db.live_callbacks.count_documents({"failed": True}),
             "unsettled": await db.live_rounds.count_documents({"settled": False}),
             "token_set": bool(_token()), "secret_set": bool(_secret()), "secret_bytes": len(_secret()),
@@ -379,7 +380,8 @@ async def live_status(_: dict = Depends(require_staff)):
 
 
 @router.get("/admin/live/server-ip")
-async def server_ip(_: dict = Depends(require_staff)):
+async def server_ip(request: Request, _: dict = Depends(require_staff)):
+    domain = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(":")[0].removeprefix("www.")
     for url in ("https://api.ipify.org?format=json", "https://ifconfig.me/all.json"):
         try:
             async with httpx.AsyncClient(timeout=8) as c:
@@ -387,7 +389,7 @@ async def server_ip(_: dict = Depends(require_staff)):
             d = r.json()
             ip = d.get("ip") or d.get("ip_addr")
             if ip:
-                return {"ip": ip, "domain": "scarmenta.com", "checked_at": now_iso()}
+                return {"ip": ip, "domain": domain, "checked_at": now_iso()}
         except (httpx.HTTPError, ValueError):
             continue
     raise HTTPException(status_code=502, detail="Could not detect the server IP right now. Try again.")

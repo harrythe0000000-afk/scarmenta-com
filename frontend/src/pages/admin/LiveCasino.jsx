@@ -38,7 +38,7 @@ const StatusCard = ({ data }) => {
   return (
     <div className="card-lux space-y-2 p-6" data-testid="live-status">
       <p className="label-eyebrow mb-2">Connection</p>
-      <Check ok={data.token_set} label="API token saved" />
+      <Check ok={data.token_set && !data.token_is_url} label={data.token_is_url ? "API token looks like a website link, not a token" : "API token saved"} />
       <p className="pl-6 text-xs text-slate-500" data-testid="live-creds-source">Keys in use from: {data.source === "admin panel" ? "Admin panel" : "Server settings"}</p>
       <Check ok={data.secret_set && data.secret_bytes === 32} label={`Secret key saved (${data.secret_bytes}/32 characters)`} />
       <Check ok={data.inr_rate > 0} label={`INR rate $1 = ₹${data.inr_rate}`} />

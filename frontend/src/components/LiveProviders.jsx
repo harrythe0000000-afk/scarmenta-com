@@ -66,11 +66,11 @@ const ProviderRow = ({ p, canEdit, reload }) => {
       </TableCell>
       {canEdit && (
         <TableCell className="whitespace-nowrap text-right">
-          <Button size="sm" variant="outline" onClick={test} disabled={busy || !p.games} data-testid={`live-provider-test-${p.provider_id}`} className="rounded-full border-purple-500/30 bg-transparent">
+          <Button size="sm" variant="outline" onClick={test} disabled={busy || !p.games} title={p.games ? "Test a launch with one of this provider's games" : "Add a game for this provider first"} data-testid={`live-provider-test-${p.provider_id}`} className="rounded-full border-purple-500/30 bg-transparent">
             <FlaskConical className="mr-1 h-3.5 w-3.5" /> {busy ? "Testing…" : "Test"}
           </Button>
           {!p.games && (
-            <button type="button" className="ml-2 align-middle" data-testid={`live-provider-delete-${p.provider_id}`}
+            <button type="button" className="ml-2 align-middle" title="Remove provider" data-testid={`live-provider-delete-${p.provider_id}`}
               onClick={() => window.confirm(`Remove ${p.name}?`) && call(() => api.delete(`/admin/live/providers/${p.id}`), "Provider removed", reload)}>
               <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-400" />
             </button>

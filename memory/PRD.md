@@ -173,3 +173,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - 2026-11-13: Demo share tracking: signup_source 'demo_share' (register ?src=demo&ref=CODE), share_visits.source; GET /api/admin/demo-shares {visits, signups, deposited, deposit_total}; card on Admin > Top sharers. demo_share signups do NOT get the calc share bonus
 - 2026-11-13: Demo share bonus: settings.demo_share_bonus_amount (default 5, Admin Settings field), paid once per friend on first approved deposit via referrals.reward_share (generic by signup_source); admin demo-shares card shows bonuses paid; HedgeShare shows bonus hint
 - 2026-11-14: GET /api/admin/live/server-ip (ipify/ifconfig.me) + 'Whitelist details for BULKAPI' card on Admin > Live Casino. Preview egress IP = 34.170.12.145 (NOT production). Inbound domain via Cloudflare shared IPs 162.159.142.117/172.66.2.113
+
+## 2026-11-14 Provider configuration system (iteration_23)
+- backend/live_providers.py: live_providers {id, provider_id, name, enabled, last_test}; seeded once (settings key live_providers_seeded) with Evolution, Ezugi, Pragmatic, JILI, JDB, SPRIBE + any game provider names; import auto-creates unknown providers (off)
+- Endpoints: GET/POST /api/admin/live/providers, POST /{id}/test (probe launch via bulkapi.probe; logs live_provider_tests; real BULKAPI error reply turns provider off, network errors don't), PATCH /{id} enable only after passing test, DELETE only when no games
+- Player games/launch/popular/recent filtered to enabled providers. Env: API_TOKEN/API_SECRET/API_BASE_URL with BULKAPI_* fallback; admin-panel keys still override
+- Old mock "Game Providers" nav item hidden (route kept). server-ip domain from request host; status flags env token that looks like a URL
+- No provider discovery endpoint exists in BULKAPI doc; all providers share one launch endpoint
