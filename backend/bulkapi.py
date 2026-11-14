@@ -27,7 +27,8 @@ from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, requ
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
-LAUNCH_URL = (os.environ.get("API_BASE_URL") or os.environ["BULKAPI_BASE_URL"]).rstrip("/") + "/launch_game"
+_BASE = (os.environ.get("API_BASE_URL") or os.environ["BULKAPI_BASE_URL"]).rstrip("/")
+LAUNCH_URL = _BASE + ("/launch_game/" if "bulkapi.site" in _BASE else "/launch_game")  # .site 301s to the slash path
 DEFAULT_RATE = 95.0
 
 
