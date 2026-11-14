@@ -143,6 +143,37 @@ const ImportCard = ({ onDone }) => {
   );
 };
 
+const ServerIpCard = () => {
+  const [res, setRes] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    try {
+      setRes((await api.get("/admin/live/server-ip")).data);
+    } catch (err) {
+      toast.error(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = (v) => { navigator.clipboard.writeText(v); toast.success("Copied"); };
+  const rows = res ? [["Domain", res.domain, "live-whitelist-domain"], ["Server IP", res.ip, "live-whitelist-ip"]] : [];
+  return (
+    <div className="card-lux space-y-3 p-6" data-testid="live-server-ip-card">
+      <p className="label-eyebrow">Whitelist details for BULKAPI</p>
+      <p className="text-xs text-slate-500">Give BULKAPI this domain and server IP. Check again after every publish, the IP can change.</p>
+      {rows.map(([l, v, id]) => (
+        <div key={id} className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-black/40 px-3 py-2">
+          <span className="w-20 text-xs text-slate-500">{l}</span>
+          <code className="flex-1 font-mono text-sm text-purple-200" data-testid={id}>{v}</code>
+          <button type="button" onClick={() => copy(v)} data-testid={`${id}-copy`}><Copy className="h-4 w-4 text-slate-400" /></button>
+        </div>
+      ))}
+      <Button type="button" onClick={check} disabled={busy} data-testid="live-server-ip-button" className="w-full rounded-full bg-purple-600 hover:bg-purple-500">{busy ? "Checking…" : res ? "Check again" : "Show server IP"}</Button>
+    </div>
+  );
+};
+
 const RateCard = ({ data, reload }) => {
   const [rate, setRate] = useState("");
   if (!data) return null;
@@ -291,6 +322,7 @@ export default function AdminLiveCasino() {
             <div className="space-y-6">
               <StatusCard data={status.data} />
               {canEdit && <CredsCard data={status.data} reload={status.reload} />}
+              <ServerIpCard />
               {canEdit && <RateCard data={status.data} reload={status.reload} />}
               {canEdit && <TestCard />}
               {canEdit && <ImportCard onDone={reload} />}

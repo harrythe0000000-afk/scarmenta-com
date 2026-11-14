@@ -367,6 +367,21 @@ async def live_status(_: dict = Depends(require_staff)):
             "inr_rate": await live_rate(), "rounds": await db.live_rounds.count_documents({})}
 
 
+@router.get("/admin/live/server-ip")
+async def server_ip(_: dict = Depends(require_staff)):
+    for url in ("https://api.ipify.org?format=json", "https://ifconfig.me/all.json"):
+        try:
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(url)
+            d = r.json()
+            ip = d.get("ip") or d.get("ip_addr")
+            if ip:
+                return {"ip": ip, "domain": "scarmenta.com", "checked_at": now_iso()}
+        except (httpx.HTTPError, ValueError):
+            continue
+    raise HTTPException(status_code=502, detail="Could not detect the server IP right now. Try again.")
+
+
 class TestIn(BaseModel):
     game_uid: str = Field(min_length=1, max_length=80)
 
