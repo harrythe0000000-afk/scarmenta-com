@@ -1,6 +1,6 @@
 import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Plug, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2, Spade, Camera, Radio } from "lucide-react";
+import { LayoutDashboard, ArrowDownToLine, ScrollText, LifeBuoy, Users, ShieldAlert, Settings2, Receipt, Gamepad2, Gift, Dices, Award, Workflow, UserCog, ShieldCheck, Handshake, ArrowLeftRight, Megaphone, Calculator, MessagesSquare, BotMessageSquare, Trophy, Share2, Spade, Camera, Radio } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -74,7 +74,6 @@ const ADMIN_NAV = [
   { id: "admin-deposits", to: "/admin/deposits", label: "Deposits", icon: ArrowDownToLine },
   { id: "admin-users", to: "/admin/users", label: "Users", icon: Users },
   { id: "admin-transactions", to: "/admin/transactions", label: "Transactions", icon: Receipt },
-  { id: "admin-providers", to: "/admin/providers", label: "Game Providers", icon: Plug, adminOnly: true },
   { id: "admin-game-activity", to: "/admin/game-activity", label: "Game Activity", icon: Dices },
   { id: "admin-referrals", to: "/admin/referrals", label: "Referrals", icon: Gift },
   { id: "admin-loss-rewards", to: "/admin/loss-rewards", label: "Loss Rewards", icon: Award, adminOnly: true },

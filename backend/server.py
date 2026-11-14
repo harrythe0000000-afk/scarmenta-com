@@ -11,6 +11,7 @@ import content
 import assistant
 import contest
 import bulkapi
+import live_providers
 
 import asyncio
 import logging
@@ -69,6 +70,8 @@ INDEXES: dict[str, list[IndexModel]] = {
                     IndexModel([("user_id", ASCENDING)], name="user_id")],
     "live_sessions": [IndexModel([("created_at", DESCENDING)], name="created_desc"),
                       IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created")],
+    "live_providers": [IndexModel([("name", ASCENDING)], name="name", unique=True),
+                       IndexModel([("provider_id", ASCENDING)], name="provider_id", unique=True)],
     "live_callbacks": [IndexModel([("created_at", DESCENDING)], name="created_desc"),
                        IndexModel([("failed", ASCENDING)], name="failed")],
     "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
@@ -893,6 +896,7 @@ app.include_router(content.router)
 app.include_router(assistant.router)
 app.include_router(contest.router)
 app.include_router(bulkapi.router)
+app.include_router(live_providers.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 
@@ -901,6 +905,7 @@ app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(
 async def startup():
     app.state.index_task = asyncio.create_task(ensure_indexes())
     await seed()
+    await live_providers.seed_providers()
     try:
         await asyncio.to_thread(content.init_storage)
     except Exception as e:

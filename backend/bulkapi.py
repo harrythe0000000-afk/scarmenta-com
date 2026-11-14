@@ -27,7 +27,7 @@ from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, requ
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
-LAUNCH_URL = os.environ["BULKAPI_BASE_URL"].rstrip("/") + "/launch_game"
+LAUNCH_URL = (os.environ.get("API_BASE_URL") or os.environ["BULKAPI_BASE_URL"]).rstrip("/") + "/launch_game"
 DEFAULT_RATE = 95.0
 
 
@@ -47,8 +47,8 @@ async def _ensure() -> None:
         token, secret = "", ""
     src = "admin panel" if token or secret else "server"
     _CACHE.update(at=time.time(), source=src,
-                  token=token or os.environ.get("BULKAPI_API_TOKEN", "").strip(),
-                  secret=secret or os.environ.get("BULKAPI_SECRET_KEY", "").strip())
+                  token=token or (os.environ.get("API_TOKEN") or os.environ.get("BULKAPI_API_TOKEN", "")).strip(),
+                  secret=secret or (os.environ.get("API_SECRET") or os.environ.get("BULKAPI_SECRET_KEY", "")).strip())
 
 
 def _token() -> str:
@@ -77,6 +77,10 @@ def build_launch_url(player: str, wallet: float, game_uid: str) -> str:
     payload = encrypt_payload({"user_id": player, "wallet_amount": wallet, "game_uid": game_uid, "token": token, "timestamp": ts})
     return LAUNCH_URL + "?" + urlencode({"user_id": player, "wallet_amount": wallet, "game_uid": game_uid,
                                         "token": token, "timestamp": ts, "payload": payload})
+
+
+async def enabled_providers() -> set:
+    return set(await db.live_providers.distinct("name", {"enabled": True}))
 
 
 async def live_rate() -> float:
@@ -117,7 +121,8 @@ FIELDS = {"_id": 0, "id": 1, "name": 1, "provider": 1, "game_uid": 1, "image_id"
 
 @router.get("/live/games")
 async def player_games(_: dict = Depends(get_current_user)):
-    rows = await db.live_games.find({"active": True, "deleted": {"$ne": True}}, FIELDS).sort("provider", 1).to_list(500)
+    rows = await db.live_games.find({"active": True, "deleted": {"$ne": True}, "provider": {"$in": list(await enabled_providers())}},
+                                    FIELDS).sort("provider", 1).to_list(2000)
     return [{k: v for k, v in g.items() if k not in ("_id", "game_uid")} for g in rows]
 
 
@@ -149,7 +154,8 @@ async def recent_games(user: dict = Depends(get_current_user)):
         {"$match": {"user_id": user["id"], "status": "launched"}},
         {"$group": {"_id": "$game_id", "last": {"$max": "$created_at"}}}, {"$sort": {"last": -1}}, {"$limit": 20}]).to_list(20)
     active = {g["id"] for g in await db.live_games.find({"id": {"$in": [r["_id"] for r in rows]}, "active": True,
-                                                        "deleted": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(20)}
+                                                        "deleted": {"$ne": True}, "provider": {"$in": list(await enabled_providers())}},
+                                                       {"_id": 0, "id": 1}).to_list(20)}
     return [{"id": r["_id"], "last": r["last"]} for r in rows if r["_id"] in active][:5]
 
 
@@ -157,7 +163,8 @@ async def recent_games(user: dict = Depends(get_current_user)):
 async def popular_games(_: dict = Depends(get_current_user)):
     top = await db.live_rounds.aggregate([
         {"$group": {"_id": "$game_uid", "rounds": {"$sum": 1}}}, {"$sort": {"rounds": -1}}, {"$limit": 30}]).to_list(30)
-    games = await db.live_games.find({"game_uid": {"$in": [t["_id"] for t in top]}, "active": True, "deleted": {"$ne": True}},
+    games = await db.live_games.find({"game_uid": {"$in": [t["_id"] for t in top]}, "active": True, "deleted": {"$ne": True},
+                                      "provider": {"$in": list(await enabled_providers())}},
                                      {"_id": 0, "id": 1, "game_uid": 1}).to_list(30)
     ids = {g["game_uid"]: g["id"] for g in games}
     return [{"id": ids[t["_id"]], "rounds": t["rounds"]} for t in top if t["_id"] in ids][:5]
@@ -173,6 +180,8 @@ async def admin_games(_: dict = Depends(require_staff)):
 async def add_game(body: GameIn, admin: dict = Depends(require_admin)):
     if await db.live_games.find_one({"game_uid": body.game_uid.strip(), "deleted": {"$ne": True}}):
         raise HTTPException(status_code=400, detail="A game with this game_uid already exists")
+    if not await db.live_providers.find_one({"name": body.provider}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="Unknown provider. Add it in the Providers tab first.")
     doc = {"id": new_id(), **body.model_dump(), "game_uid": body.game_uid.strip(), "created_by": admin["email"],
            "created_at": now_iso(), "deleted": False}
     await db.live_games.insert_one(dict(doc))
@@ -221,6 +230,8 @@ async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
     game = await db.live_games.find_one({"id": body.game_id, "active": True, "deleted": {"$ne": True}}, {"_id": 0})
     if not game:
         await _fail(user, None, 404, "Game not available")
+    if game["provider"] not in await enabled_providers():
+        await _fail(user, game, 403, "This provider is not available right now")
     if not _token() or not _secret():
         await _fail(user, game, 503, "Live casino is not set up yet. Please contact support.")
     fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "promo_balance": 1, "bulk_player_id": 1})
@@ -386,22 +397,39 @@ class TestIn(BaseModel):
     game_uid: str = Field(min_length=1, max_length=80)
 
 
-@router.post("/admin/live/test")
-async def test_launch(body: TestIn, _: dict = Depends(require_admin)):
+ERROR_WORDS = ("not found", "missing", "invalid", "error", "expired", "denied", "disabled", "failed")
+
+
+async def probe(game_uid: str) -> dict:
     await _ensure()
     if not _token() or not _secret():
-        raise HTTPException(status_code=400, detail="API token or secret key is missing")
-    url = build_launch_url("9000000000", 100.0, body.game_uid.strip())
+        return {"ok": False, "status": 0, "redirect": "", "detail": "API token or secret key is missing"}
+    url = build_launch_url("9000000000", 100.0, game_uid.strip())
     try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=False) as c:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20, connect=8), follow_redirects=False) as c:
             r = await c.get(url)
+    except httpx.TimeoutException:
+        return {"ok": False, "status": 0, "redirect": "", "detail": "BULKAPI did not answer in time"}
     except httpx.HTTPError as e:
-        return {"ok": False, "status": 0, "detail": f"Could not reach BULKAPI: {e.__class__.__name__}"}
-    location = r.headers.get("location", "")
-    text = r.text[:400]
-    ok = (r.is_redirect and bool(location)) or (r.status_code == 200 and "not found" not in text.lower()
-                                                 and "missing" not in text.lower() and "invalid" not in text.lower())
+        return {"ok": False, "status": 0, "redirect": "", "detail": f"Could not reach BULKAPI: {e.__class__.__name__}"}
+    location, text = r.headers.get("location", ""), r.text[:400]
+    low = text.lower()
+    if "application/json" in r.headers.get("content-type", ""):
+        try:
+            j = r.json()
+            low = json.dumps(j).lower()
+            if isinstance(j, dict) and (j.get("status") in (False, 0, "error", "fail", "failed") or j.get("success") is False):
+                low += " error"
+        except ValueError:
+            low += " invalid"
+    ok = (r.is_redirect and bool(location)) or (r.status_code == 200 and not any(w in low for w in ERROR_WORDS))
+    logger.info(f"BULKAPI probe game_uid={game_uid} status={r.status_code} ok={ok}")
     return {"ok": ok, "status": r.status_code, "redirect": location[:300], "detail": text}
+
+
+@router.post("/admin/live/test")
+async def test_launch(body: TestIn, _: dict = Depends(require_admin)):
+    return await probe(body.game_uid)
 
 
 @router.get("/admin/live/ggr")
@@ -537,4 +565,6 @@ async def import_games(file: UploadFile = File(...), admin: dict = Depends(requi
         added += 1
     if docs:
         await db.live_games.insert_many(docs)
+        from live_providers import ensure_providers
+        await ensure_providers({d["provider"] for d in docs}, admin["email"])
     return {"added": added, "skipped": skipped, "errors": errors[:50], "error_count": len(errors)}

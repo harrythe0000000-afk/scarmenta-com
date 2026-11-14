@@ -8,13 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/StatCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallbackLogs, LaunchHistory, PlayerReport, RoundHistory } from "@/components/LiveReports";
+import { LiveProviders } from "@/components/LiveProviders";
 import { ImagePicker } from "@/pages/admin/Popups";
 import { useAuth } from "@/context/AuthContext";
 import { api, API, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { fmtDate } from "@/lib/format";
 
-const PROVIDERS = ["Ezugi", "Evolution", "Microgaming", "Playtech", "Iconic21", "ORA Gaming", "Macro Gaming", "Other"];
 const EMPTY = { name: "", provider: "Evolution", game_uid: "", image_id: null };
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const CALLBACKS = [`${API}/bulkapi/callback`, `${API}/game_callback.php`];
@@ -227,8 +227,8 @@ const TestCard = () => {
   );
 };
 
-const AddGame = ({ onDone }) => {
-  const [f, setF] = useState(EMPTY);
+const AddGame = ({ onDone, providers }) => {
+  const [f, setF] = useState({ ...EMPTY, provider: providers[0]?.name || "" });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const submit = (e) => {
     e.preventDefault();
@@ -240,7 +240,7 @@ const AddGame = ({ onDone }) => {
       <ImagePicker imageId={f.image_id} onChange={(id) => setF({ ...f, image_id: id })} />
       <Input required minLength={2} placeholder="Game name, e.g. Lightning Roulette" value={f.name} onChange={set("name")} data-testid="live-game-name-input" className="border-purple-500/20 bg-black/40" />
       <select value={f.provider} onChange={set("provider")} data-testid="live-game-provider-select" className="h-10 w-full rounded-md border border-purple-500/20 bg-black/40 px-3 text-sm text-white">
-        {PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+        {providers.map((p) => <option key={p.id} value={p.name}>{p.name}{p.enabled ? "" : " (off)"}</option>)}
       </select>
       <Input required placeholder="game_uid from BULKAPI" value={f.game_uid} onChange={set("game_uid")} data-testid="live-game-uid-input" className="border-purple-500/20 bg-black/40 font-mono" />
       <Button data-testid="live-add-game-button" className="w-full rounded-full bg-purple-600 hover:bg-purple-500"><Plus className="mr-2 h-4 w-4" /> Add game</Button>
@@ -306,12 +306,15 @@ export default function AdminLiveCasino() {
   const canEdit = user?.role === "admin";
   const { data, reload } = useFetch("/admin/live/games");
   const status = useFetch("/admin/live/status");
+  const prov = useFetch("/admin/live/providers");
+  const reloadAll = () => { reload(); prov.reload(); };
   return (
     <>
       <PageHeader eyebrow="BULKAPI" title="Live casino" desc="Manage live dealer games, check the BULKAPI connection and see GGR by provider." />
       <Tabs defaultValue="setup" data-testid="live-tabs">
         <TabsList className="mb-6 flex-wrap bg-black/40">
           <TabsTrigger value="setup" data-testid="live-tab-setup">Setup & games</TabsTrigger>
+          <TabsTrigger value="providers" data-testid="live-tab-providers">Providers</TabsTrigger>
           <TabsTrigger value="launches" data-testid="live-tab-launches">Launch history</TabsTrigger>
           <TabsTrigger value="rounds" data-testid="live-tab-rounds">Bets & wins</TabsTrigger>
           <TabsTrigger value="players" data-testid="live-tab-players">Player report</TabsTrigger>
@@ -325,8 +328,8 @@ export default function AdminLiveCasino() {
               <ServerIpCard />
               {canEdit && <RateCard data={status.data} reload={status.reload} />}
               {canEdit && <TestCard />}
-              {canEdit && <ImportCard onDone={reload} />}
-              {canEdit && <AddGame onDone={reload} />}
+              {canEdit && <ImportCard onDone={reloadAll} />}
+              {canEdit && prov.data?.length > 0 && <AddGame onDone={reloadAll} providers={prov.data} />}
             </div>
             <div className="space-y-6">
               <Games games={data || []} canEdit={canEdit} reload={reload} />
@@ -334,6 +337,7 @@ export default function AdminLiveCasino() {
             </div>
           </div>
         </TabsContent>
+        <TabsContent value="providers"><LiveProviders providers={prov.data} canEdit={canEdit} reload={prov.reload} /></TabsContent>
         <TabsContent value="launches"><LaunchHistory /></TabsContent>
         <TabsContent value="rounds"><RoundHistory /></TabsContent>
         <TabsContent value="players"><PlayerReport /></TabsContent>
