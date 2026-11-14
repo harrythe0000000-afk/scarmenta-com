@@ -1,0 +1,26 @@
+{
+  "summary": "Backend-only retest of the BULKAPI host switch from bulkapi.org to bulkapi.site. All 5 requested checks pass (5/5). (1) GET /admin/live/status returns reachable=true, launch_url=https://bulkapi.site/launch_game/, token_is_url=true and source=server. (2) POST /admin/live/test {game_uid:'TEST'} reaches BULKAPI and gets HTTP 200 with body {\"status\":\"error\",\"message\":\"Token not found or secret key missing in database.\"}; the code correctly reads this as ok=false. (3) For a temporary TEST_ provider enabled in mongo, player POST /live/launch returns a URL starting with https://bulkapi.site/launch_game/?. Opening that URL hits BULKAPI (200, same token error JSON), so DNS works. (4) Provider test with a BULKAPI error reply (status 200) gives ok=false and sets enabled=false, and PATCH enabled=true is then refused (400). (5) Callback /api/game_callback.php with the process env token returns 'ok' and credits 95 INR / rate. A duplicate round returns 'ok' with no balance change and is logged as 'duplicate'. A wrong token gets 403. The only remaining blocker is user-side credentials: the token is a URL (https://laaara.in/vish/callback.php) and the secret is 30 characters.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "regression tests (outdated, not code bugs)", "issue": "7 older assertions now fail because the intended behaviour changed. test_live_providers_central: test_list_seeded and test_status_uses_base_url expect '/launch_game' without the trailing slash; test_server_ip expects the hard-coded domain 'scarmenta.com', but the domain now comes from the Host header. test_live_casino_bulkapi: test_status asserts reachable is False (it is now True); test_launch_url, test_launch_zero_balance and test_player_games_hide_uid assume Evolution is enabled, but providers now start disabled. test_test_launch in the same file expects 'reach' in the detail and will also fail now that BULKAPI is reachable."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_bulkapi_site_switch.py", "/app/test_reports/pytest/bulkapi_site_switch.xml"],
+  "action_items": [
+    "Update the outdated regression tests: trailing slash in launch_url, reachable now true, server-ip domain taken from the Host header, and enable a TEST_ provider in the test_live_casino_bulkapi fixtures.",
+    "User action: in Admin > Live Casino, save the real API Token (not the .php URL) and the 32-character Secret Key. BULKAPI currently answers 'Token not found or secret key missing in database.'"
+  ],
+  "critical_code_review_comments": [
+    "LAUNCH_URL picks the trailing slash by checking for the substring 'bulkapi.site' in the base URL. This is brittle: another host would get no slash and take an extra 301. Consider following redirects, or always using the slash if bulkapi.org also accepts it.",
+    "probe() only treats a 200 reply as failed if it contains one of the ERROR_WORDS. An HTML error page from BULKAPI that avoids those words would be reported as ok=true. The JSON status='error' check covers the current reply.",
+    "The provider test now correctly skips auto-disable on network errors (status 0)."
+  ],
+  "updated_files": ["/app/backend/tests/test_bulkapi_site_switch.py"],
+  "success_rate": {"backend": "100% (5/5) of the requested checks; older live test files 7 failures, all outdated assertions", "frontend": "not tested (backend only requested)"},
+  "seed_data_creation": "None kept. A TEST_SiteProv_ provider and game were created, along with their sessions, provider_tests, a TEST_rnd round, callbacks and a transaction; all were deleted. The demo promo_balance is back to 1039, inr_rate is 95, no provider is enabled, and no bulkapi_creds doc exists.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with -n 0. Load the env with: set -a; . backend/.env; . frontend/.env; and export BULK_TOKEN from /proc/<uvicorn pid>/environ BULKAPI_API_TOKEN. bulkapi.site is now reachable; with the current creds BULKAPI returns 200 with {status:error, message:'Token not found or secret key missing in database.'}."
+}

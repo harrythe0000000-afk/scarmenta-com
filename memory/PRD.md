@@ -180,3 +180,4 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Player games/launch/popular/recent filtered to enabled providers. Env: API_TOKEN/API_SECRET/API_BASE_URL with BULKAPI_* fallback; admin-panel keys still override
 - Old mock "Game Providers" nav item hidden (route kept). server-ip domain from request host; status flags env token that looks like a URL
 - No provider discovery endpoint exists in BULKAPI doc; all providers share one launch endpoint
+- 2026-11-14 (iteration_24): switched API_BASE_URL/BULKAPI_BASE_URL to https://bulkapi.site (user approved; .org no DNS); LAUNCH_URL uses /launch_game/ for .site. BULKAPI now reachable; replies 'Token not found or secret key missing' because env token = Lara callback URL (laaara.in/vish/callback.php) and secret 30 chars. Old player 'Games' tab (games.py mock providers) is NOT BULKAPI; user chose to keep it
