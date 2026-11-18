@@ -210,7 +210,7 @@ export const Register = () => {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const shareSource = { calc: "calc_share", demo: "demo_share" }[params.get("src")];
+  const shareSource = { calc: "calc_share", demo: "demo_share", live: "live_share" }[params.get("src")];
   const fromShare = !!shareSource && !!params.get("ref");
   useEffect(() => {
     const code = params.get("ref");

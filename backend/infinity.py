@@ -4,7 +4,7 @@ import json
 import logging
 import math
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -15,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 import bulkapi
 from bulkapi import INF_BASE, _ensure, _token, live_rate
-from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, require_admin, require_staff
+from core import now, client_ip, db, get_current_user, make_tx, new_id, now_iso, require_admin, require_staff
 from live_providers import ensure_providers
 
 router = APIRouter(prefix="/api")
@@ -174,7 +174,58 @@ async def catalog_import(body: ImportIn, admin: dict = Depends(require_admin)):
     return await sync_provider(body.brand_id, body.name, admin["email"])
 
 
+AUTO_PROVIDERS = [("59", "Evolution Live (Asia)"), ("78", "Ezugi"), ("55", "PragmaticPlayLive-EU"), ("57", "Spribe"), ("49", "JILI")]
+
+
+async def _auto_one(brand: str, name: str) -> bool:
+    await sync_provider(brand, name, "auto import")
+    games = await db.live_games.find({"provider": name, "deleted": {"$ne": True}, "active": True}, {"_id": 0, "game_uid": 1}).to_list(3)
+    res = None
+    for g in games:
+        res = await bulkapi.probe(g["game_uid"])
+        if res["ok"] or not res.get("game_missing"):
+            break
+    if not res:
+        return False
+    upd = {"last_test": {"ok": res["ok"], "status": res["status"], "game_uid": g["game_uid"], "detail": res["detail"][:300],
+                         "by": "auto import", "at": now_iso()}}
+    if res["ok"]:
+        upd["enabled"] = True
+    await db.live_providers.update_one({"name": name}, {"$set": upd})
+    logger.info(f"Auto import {name}: ok={res['ok']} {res['detail'][:120]}")
+    return res["ok"]
+
+
+async def auto_import() -> None:
+    try:
+        await _ensure()
+        if not _token():
+            return
+        st = await db.settings.find_one({"key": "auto_import_v1"}, {"_id": 0, "done": 1}) or {}
+        ready = await db.live_providers.distinct("brand_id", {"enabled": True})
+        todo = [p for p in AUTO_PROVIDERS if p[0] not in st.get("done", []) and p[0] not in ready]
+        if not todo:
+            return
+        await db.locks.delete_one({"_id": "auto_import", "at": {"$lt": (now() - timedelta(minutes=15)).isoformat()}})
+        try:
+            await db.locks.insert_one({"_id": "auto_import", "at": now_iso()})
+        except DuplicateKeyError:
+            return
+        try:
+            for brand, name in todo:
+                try:
+                    if await _auto_one(brand, name):
+                        await db.settings.update_one({"key": "auto_import_v1"}, {"$addToSet": {"done": brand}}, upsert=True)
+                except HTTPException as e:
+                    logger.warning(f"Auto import {name} failed: {e.detail}")
+        finally:
+            await db.locks.delete_one({"_id": "auto_import"})
+    except Exception:
+        logger.exception("Auto import failed")
+
+
 async def _run_sync(run_id: str) -> None:
+    await auto_import()
     results = {}
     for p in await db.live_providers.find({"brand_id": {"$exists": True, "$ne": None}}, {"_id": 0, "name": 1, "brand_id": 1}).to_list(200):
         try:
@@ -229,7 +280,11 @@ async def session_result(since: str, user: dict = Depends(get_current_user)):
         {"$match": {"user_id": user["id"], "created_at": {"$gte": since}}},
         {"$group": {"_id": None, "bet": {"$sum": "$bet_inr"}, "win": {"$sum": "$win_inr"}, "usd": {"$sum": "$delta_usd"}, "n": {"$sum": 1}}}]).to_list(1)
     r = rows[0] if rows else {"bet": 0, "win": 0, "usd": 0, "n": 0}
-    return {"events": r["n"], "bet_inr": round(r["bet"], 2), "win_inr": round(r["win"], 2), "net_inr": round(r["win"] - r["bet"], 2),
+    top = await db.live_events.aggregate([
+        {"$match": {"user_id": user["id"], "created_at": {"$gte": since}}},
+        {"$group": {"_id": {"g": "$game_uid", "r": "$game_round"}, "net": {"$sum": {"$subtract": ["$win_inr", "$bet_inr"]}}}},
+        {"$sort": {"net": -1}}, {"$limit": 1}]).to_list(1)
+    return {"top_round_inr": round(top[0]["net"], 2) if top else 0, "events": r["n"], "bet_inr": round(r["bet"], 2), "win_inr": round(r["win"], 2), "net_inr": round(r["win"] - r["bet"], 2),
             "net_usd": round(r["usd"], 2)}
 
 

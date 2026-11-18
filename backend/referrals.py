@@ -37,7 +37,7 @@ async def my_referrals(request: Request, user: dict = Depends(get_current_user))
 
 
 async def reward_referrer(dep: dict) -> None:
-    referee = await db.users.find_one({"id": dep["user_id"]}, {"_id": 0, "id": 1, "name": 1, "referred_by": 1})
+    referee = await db.users.find_one({"id": dep["user_id"]}, {"_id": 0, "id": 1, "name": 1, "referred_by": 1, "signup_source": 1})
     if not referee or not referee.get("referred_by"):
         return
     s = await get_settings()
@@ -57,13 +57,13 @@ async def reward_referrer(dep: dict) -> None:
     if referrer:
         await db.transactions.insert_one(make_tx(
             referrer, "referral_bonus", "credit", bonus,
-            f"Referral income: {s['referral_bonus_percent']:g}% of {mask_name(referee['name'])}'s ${dep['amount']:,.2f} deposit",
+            f"{'Win share bonus' if referee.get('signup_source') == 'live_share' else 'Referral income'}: {s['referral_bonus_percent']:g}% of {mask_name(referee['name'])}'s ${dep['amount']:,.2f} deposit",
             dep["reference"], referrer["promo_balance"]))
 
 
 class ShareVisitIn(BaseModel):
     code: str = Field(min_length=3, max_length=20)
-    source: Literal["calc_share", "demo_share"] = "calc_share"
+    source: Literal["calc_share", "demo_share", "live_share"] = "calc_share"
 
 
 @router.post("/share/visit")
@@ -82,7 +82,7 @@ async def share_me(user: dict = Depends(get_current_user)):
     s = await get_settings()
     q = {"referred_by": user["id"], "signup_source": "calc_share"}
     return {"bonus_amount": s.get("share_bonus_amount", 0),
-            "visits": await db.share_visits.count_documents({"referrer_id": user["id"], "source": {"$ne": "demo_share"}}),
+            "visits": await db.share_visits.count_documents({"referrer_id": user["id"], "source": {"$nin": ["demo_share", "live_share"]}}),
             "signups": await db.users.count_documents(q),
             "deposited": len(await db.deposits.distinct("user_id", {
                 "status": "approved", "user_id": {"$in": await db.users.distinct("id", q)}})),

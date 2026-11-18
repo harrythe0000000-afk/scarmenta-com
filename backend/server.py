@@ -107,7 +107,7 @@ class RegisterIn(BaseModel):
     agent_code: Optional[str] = Field(default=None, max_length=20)
     accepted_terms: bool = False
     terms_version: Optional[str] = Field(default=None, max_length=20)
-    signup_source: Optional[Literal["calc_share", "demo_share"]] = None
+    signup_source: Optional[Literal["calc_share", "demo_share", "live_share"]] = None
 
 
 class LoginIn(BaseModel):
@@ -913,6 +913,7 @@ async def startup():
     app.state.index_task = asyncio.create_task(ensure_indexes())
     await seed()
     await live_providers.seed_providers()
+    app.state.auto_import = asyncio.create_task(infinity.auto_import())
     try:
         await asyncio.to_thread(content.init_storage)
     except Exception as e:

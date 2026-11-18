@@ -198,3 +198,10 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - GET /api/live/big-wins (net_inr>=100, masked names) -> BigWinFeed marquee on player casino page
 - Imported + tested + enabled: Evolution Live (Asia) 59, Ezugi 78, PragmaticPlayLive-EU 55, Spribe 57, JILI 49 (preview DB only; production needs import again from Admin > Live Casino)
 - Backlog: big-wins 7-day window, session-result use server time, popup retry on network blip, single-item marquee duplicate, store provider msg in GGR alert
+
+## 2026-11-18 Auto provider import, win share bonus, mega win popup
+- infinity.auto_import(): on backend startup + before each catalog cron, imports/tests/enables Evolution Live (Asia) 59, Ezugi 78, PragmaticPlayLive-EU 55, Spribe 57, JILI 49 (settings key auto_import_v1.done; lock db.locks auto_import; enables only if probe launch succeeds, so retries daily while GGR empty / IP not whitelisted)
+- Live win share link = /register?ref=CODE&src=live -> signup_source live_share, share_visits source live_share; referrer gets normal referral % on EVERY approved deposit (tx text "Win share bonus"); no extra fixed bonus (user choice)
+- session-result returns top_round_inr; LiveResultPopup shows MEGA WIN (crown, confetti, gold glow) when one round net >= ₹10,000
+- LiveResultPopup polling now survives network errors (try/catch per attempt)
+- Tested by main agent (curl + screenshot); testing agent not run for this batch

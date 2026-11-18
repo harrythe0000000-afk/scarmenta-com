@@ -11,7 +11,7 @@ import { play } from "@/lib/sounds";
 
 const CONFETTI = ["#f59e0b", "#d946ef", "#8b5cf6", "#10b981", "#f43f5e"];
 
-const Confetti = () => (
+export const Confetti = () => (
   <div className="pointer-events-none absolute inset-0 overflow-hidden">
     {Array.from({ length: 24 }).map((_, i) => (
       <motion.span key={i} className="absolute top-0 h-2 w-1.5 rounded-sm" style={{ left: `${(i * 37) % 100}%`, background: CONFETTI[i % 5] }}
