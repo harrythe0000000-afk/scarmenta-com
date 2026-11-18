@@ -117,10 +117,10 @@ async def _catalog(path: str, **params) -> dict:
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="InfinityAPI did not answer in time")
     except (httpx.HTTPError, ValueError):
-        raise HTTPException(status_code=502, detail="InfinityAPI returned an unreadable answer")
+        raise HTTPException(status_code=424, detail="InfinityAPI returned an unreadable answer")
     if not isinstance(j, dict) or j.get("ok") is not True:
         err = (j or {}).get("error") or (j or {}).get("message") if isinstance(j, dict) else None
-        raise HTTPException(status_code=502, detail=f"InfinityAPI: {err or 'request rejected'} (HTTP {r.status_code})")
+        raise HTTPException(status_code=424, detail=f"InfinityAPI: {err or 'request rejected'} (HTTP {r.status_code})")
     return j
 
 

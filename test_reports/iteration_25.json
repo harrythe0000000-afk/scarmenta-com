@@ -1,0 +1,46 @@
+{
+  "summary": "Tested the InfinityAPI integration that replaces BULKAPI, on both backend and frontend. 25/25 pytest checks pass: 9 unit tests for the launch signature and form fields with httpx monkeypatched, and 16 API tests against the public URL. Covered: status, admin-box keys, the connection test against the real InfinityAPI (401 INVALID_CREDENTIALS), the provider catalogue (400 without a key, 502 with a fake key), the callback ledger (loss, win, duplicate, conflict, invalid input), a failed player launch, and the 2h transfer pause. Main problem: the preview ingress (Cloudflare) swaps every 502 response body for an HTML 'Bad gateway' page. The player's 'could not be opened' message and the 'InfinityAPI: invalid_api_key' detail never reach the browser; the admin sees a Cloudflare error toast instead. Admin UI checked: keys box, callback URL copy, whitelist card, Providers catalogue box with error toasts. The player tile shows image_url.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/live/launch, GET /api/admin/live/catalog/providers, POST /api/admin/live/catalog/import", "issue": "These return HTTP 502 for InfinityAPI errors. Through the public URL the JSON body is replaced by Cloudflare's HTML 'Bad gateway' page; it is intact on localhost:8001. The frontend toast then reads 'The origin web server returned an invalid or incomplete response to Cloudflare...'. 503 and 400 pass through fine. Use a non-502 status, e.g. 424, 409 or 503.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/bulkapi/callback, POST /api/game_callback.php", "issue": "The old BULKAPI callback handler is still mounted. Its auth token is now the InfinityAPI api_key, which is also sent as a query parameter on the catalogue GET requests. Anyone who has the api_key can credit balances through the old format (fields mobile=bulk_player_id, game_round). Remove both routes or disable them."},
+      {"endpoint": "GET /api/admin/live/status", "issue": "The 'reachable' probe has a 4s timeout. The first admin page load once showed 'InfinityAPI not reachable'; the API test right before returned reachable=true."},
+      {"endpoint": "PUT /api/admin/live/credentials", "issue": "Some wording still says BULKAPI: the URL-token error text, audit actions bulkapi_credentials_*, and a decrypt log message."},
+      {"endpoint": "POST /api/infinity/callback", "issue": "bet_amount and win_amount are both required, so an event that leaves out bet_amount on a win gets a 400. Check this against the InfinityAPI docs; if amounts can be missing, treat a missing amount as 0."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "StatusCard", "issue": "The label always reads 'API token saved', even with a red X when nothing is saved. It should read 'API key not saved', and use 'API Key' to match the keys box.", "selector": "[data-testid='live-status']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Providers tab > Load from InfinityAPI with a fake key; player launch failure", "issue": "The toast shows the Cloudflare 502 HTML message instead of the InfinityAPI error, caused by the 502 status code described above.", "affected_selectors": ["[data-testid='live-catalog-load']"]}
+    ],
+    "design_issues": [
+      {"screen": "Admin Live casino > GGR", "issues": ["Callback rounds for game_uids that are not in live_games are grouped as provider 'Unknown'. This is expected until a catalogue import, but you could fall back to the provider brand name."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_infinity_api.py", "/app/backend/tests/test_infinity_signature.py", "/app/test_reports/pytest/pytest_infinity.xml"],
+  "action_items": [
+    "Change the 502 status for InfinityAPI errors (live launch, catalogue, import) to a code the ingress passes through (e.g. 424 or 409), so users see the real message.",
+    "Remove or disable the old /api/bulkapi/callback and /api/game_callback.php handlers.",
+    "Fix the StatusCard 'API token saved' wording when nothing is saved.",
+    "Optional: raise the reachability timeout or cache the result."
+  ],
+  "critical_code_review_comments": [
+    "infinity.py: the live_events row is inserted before the balance $inc. If the process crashes between the two, the event stays applied=false and is never retried, because a resend is treated as a duplicate. Consider reconciling events where applied=false.",
+    "infinity.py _catalog: the api_key is sent as a GET query parameter, so it can end up in proxy logs. Use a header if InfinityAPI supports one.",
+    "Callback ledger checked: rate 95, a 95 INR loss gives -1 USD and a 190 INR win gives +2 USD. Identical duplicates are ignored, same serial with different amounts gets 409, and with no serial the timestamp+amounts key removes duplicates.",
+    "Launch signature checked: HMAC-SHA256(secret, api_key|user_id|game_uid|balance|ts), balance as a 2-decimal string, currency_code=INR, redirect=0. Non-ok JSON, HTTP non-2xx, non-JSON bodies and non-https game_url all raise LaunchError."
+  ],
+  "updated_files": ["/app/backend/tests/test_infinity_api.py", "/app/backend/tests/test_infinity_signature.py"],
+  "success_rate": {"backend": "100% (25/25 tests); 502 body replacement found at the ingress layer", "frontend": "90% (all elements work; the error toast shows Cloudflare text because of the 502)"},
+  "test_credentials": "admin@aetheria.io / Admin@12345, demo@aetheria.io / Demo@12345 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None kept. Cleaned up as requested: deleted all live_events, live_rounds, live_callbacks and live_sessions, plus the live_round transactions. These included the main agent's earlier R1 test data. Also removed the TEST_ live_games, set Evolution back to enabled=false, removed the admin-box keys (cb_enc callback token kept) and set demo promo_balance to 1039.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run with: cd /app/backend && pytest tests/test_infinity_api.py tests/test_infinity_signature.py -n 0. Run serially because the tests share credentials and provider state. Over the public URL, 502 bodies are HTML, so the tests only assert the status code and check the failure reason in live_sessions. Demo bulk_player_id is 9111111111 (member scm_9111111111). The old BULKAPI test files (test_live_casino_bulkapi.py etc.) are outdated.",
+  "rca of the issue": "The FastAPI 502 response is correct on localhost:8001 ({\"detail\":\"InfinityAPI: invalid_api_key (HTTP 200)\"}), but on the public URL Cloudflare/ingress swaps any origin 502 for its own 'Bad gateway' HTML page. To reproduce: save fake keys, then go to Providers > Load from InfinityAPI. To fix: return a different status code, e.g. 424."
+}

@@ -181,3 +181,12 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - Old mock "Game Providers" nav item hidden (route kept). server-ip domain from request host; status flags env token that looks like a URL
 - No provider discovery endpoint exists in BULKAPI doc; all providers share one launch endpoint
 - 2026-11-14 (iteration_24): switched API_BASE_URL/BULKAPI_BASE_URL to https://bulkapi.site (user approved; .org no DNS); LAUNCH_URL uses /launch_game/ for .site. BULKAPI now reachable; replies 'Token not found or secret key missing' because env token = Lara callback URL (laaara.in/vish/callback.php) and secret 30 chars. Old player 'Games' tab (games.py mock providers) is NOT BULKAPI; user chose to keep it
+
+## 2026-11-14 Switched live casino to InfinityAPI (replaces BULKAPI)
+- Env INFINITY_BASE_URL=https://infinityapipro.com; keys INFINITY_API_KEY / INFINITY_CLIENT_SECRET or Admin box (settings key infinity_creds, Fernet); callback token auto-generated (cb_enc)
+- Launch: server POST /api/v1/launch.php form (api_key,user_id=scm_<bulk_player_id>,game_uid,balance "x.xx" INR,ts,sig=HMAC-SHA256(api_key|user_id|game_uid|balance|ts),currency_code INR,language en,return,redirect 0) -> JSON ok/game_url; 15s anti double-launch; requires our outbound IP whitelisted
+- Callback: POST /api/infinity/callback?token=... JSON; event key sha256(member,game_uid,round,serial|timestamp+amounts) in live_events (unique); same fingerprint dup -> ok, different -> 409; applies (win-bet)/rate to promo_balance; live_rounds aggregated per uid:round:pid; returns {"ok":true}
+- Catalog: GET /api/admin/live/catalog/providers, POST /api/admin/live/catalog/import {brand_id,name} (games with img -> image_url)
+- Transfers blocked 2h after a live launch. Old BULKAPI callback routes still exist but unused
+- 2026-11-14 (iteration_25): InfinityAPI errors now 424 (Cloudflare replaces 502 bodies); old BULKAPI callback routes (/api/bulkapi/callback, /api/game_callback.php) removed; BULKAPI_BASE_URL/API_BASE_URL removed from .env. Pending: user to enter INFINITY_API_KEY / INFINITY_CLIENT_SECRET via secure card; whitelist prod outbound IP; set callback URL from admin status in InfinityAPI panel
+- 2026-11-18: Real InfinityAPI keys working in preview. Imported Casino Game (CG) brand 134 (7 games) + Evolution Live brand 58 (237 games); both provider tests passed and enabled. Player launch blocked by provider: 'Provider GGR Balance is depleted' (operator must recharge). Evolution game 6312 returns 'game not found'. Failed launch reason now stored for admin.
