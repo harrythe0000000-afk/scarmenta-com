@@ -81,11 +81,53 @@ const ProviderRow = ({ p, canEdit, reload }) => {
   );
 };
 
+const DEFAULT_IMPORT = /casino game \(cg\)|evolution live/i;
+
+const CatalogImport = ({ onDone }) => {
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState("");
+  const load = async () => {
+    setBusy("load");
+    await call(() => api.get("/admin/live/catalog/providers"), null, setList);
+    setBusy("");
+  };
+  const importOne = async (p) => {
+    setBusy(p.brand_id);
+    await call(() => api.post("/admin/live/catalog/import", { brand_id: p.brand_id, name: p.name }), null,
+      (r) => { toast.success(`${p.name}: ${r.added} added, ${r.updated} updated`); onDone(); });
+    setBusy("");
+  };
+  const sorted = (list || []).slice().sort((a, b) => DEFAULT_IMPORT.test(b.name) - DEFAULT_IMPORT.test(a.name));
+  return (
+    <div className="card-lux space-y-3 p-5" data-testid="live-catalog">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="label-eyebrow">Providers on your InfinityAPI account</p>
+        <Button size="sm" onClick={load} disabled={busy === "load"} data-testid="live-catalog-load" className="rounded-full bg-purple-600 hover:bg-purple-500">{busy === "load" ? "Loading…" : list ? "Refresh list" : "Load from InfinityAPI"}</Button>
+      </div>
+      {list && list.length === 0 && <p className="text-xs text-slate-500">No providers are assigned to this account yet. Ask your InfinityAPI administrator.</p>}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sorted.map((p) => (
+          <div key={p.brand_id} className="flex items-center justify-between gap-2 rounded-lg border border-purple-500/15 bg-black/30 px-3 py-2" data-testid={`live-catalog-${p.brand_id}`}>
+            <div className="min-w-0">
+              <p className="truncate text-sm text-white">{p.name}</p>
+              <p className="text-[10px] text-slate-500">ID {p.brand_id} · {p.games_count ?? "?"} games · {p.status || "—"}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => importOne(p)} disabled={!!busy} data-testid={`live-catalog-import-${p.brand_id}`} className="rounded-full border-purple-500/30 bg-transparent">
+              {busy === p.brand_id ? "Importing…" : "Import games"}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const LiveProviders = ({ providers, canEdit, reload }) => (
   <div className="space-y-4" data-testid="live-providers">
     <p className="text-sm text-slate-400">
-      All providers run through the same BULKAPI gateway and keys. BULKAPI has no provider list API, so add providers here. A provider can be turned on for players only after a test launch with one of its games passes. A failed test turns it off.
+      All providers run through the same InfinityAPI account and keys. Import a provider's games from InfinityAPI below. A provider can be turned on for players only after a test launch with one of its games passes. A failed test turns it off.
     </p>
+    {canEdit && <CatalogImport onDone={reload} />}
     {canEdit && <AddProvider onDone={reload} />}
     <div className="card-lux overflow-x-auto">
       <Table>

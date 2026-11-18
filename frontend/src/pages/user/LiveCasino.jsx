@@ -15,7 +15,7 @@ const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav, tag = "" }) => (
   <button type="button" onClick={() => onPlay(g)} disabled={!!busy} data-testid={`live-game-${tag}${g.id}`}
     className="group w-full overflow-hidden rounded-2xl border border-purple-500/20 bg-black/40 text-left transition-transform hover:-translate-y-1 disabled:opacity-60">
     <div className="relative h-36 bg-gradient-to-br from-violet-900 to-fuchsia-900">
-      <img src={g.image_id ? bannerImg(g.image_id) : defaultGameImage(g)} alt={g.name} loading="lazy" data-testid={`live-game-img-${g.id}`}
+      <img src={g.image_id ? bannerImg(g.image_id) : g.image_url || defaultGameImage(g)} alt={g.name} loading="lazy" data-testid={`live-game-img-${g.id}`}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white"><Radio className="h-3 w-3" /> LIVE</span>
       {rank && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-amber-400 font-num text-xs font-bold text-black" data-testid={`live-popular-rank-${rank}`}>#{rank}</span>}

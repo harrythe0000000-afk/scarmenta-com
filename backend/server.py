@@ -12,6 +12,7 @@ import assistant
 import contest
 import bulkapi
 import live_providers
+import infinity
 
 import asyncio
 import logging
@@ -72,6 +73,7 @@ INDEXES: dict[str, list[IndexModel]] = {
                       IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created")],
     "live_providers": [IndexModel([("name", ASCENDING)], name="name", unique=True),
                        IndexModel([("provider_id", ASCENDING)], name="provider_id", unique=True)],
+    "live_events": [IndexModel([("event_key", ASCENDING)], name="event_key", unique=True)],
     "live_callbacks": [IndexModel([("created_at", DESCENDING)], name="created_desc"),
                        IndexModel([("failed", ASCENDING)], name="failed")],
     "banner_events": [IndexModel([("banner_id", ASCENDING), ("user_id", ASCENDING), ("type", ASCENDING)],
@@ -550,6 +552,9 @@ async def create_deposit(body: DepositIn, request: Request, user: dict = Depends
 async def create_transfer(body: TransferIn, user: dict = Depends(get_current_user)):
     if user.get("role") != "user":
         raise HTTPException(status_code=403, detail="Only player accounts can transfer")
+    since = (now() - timedelta(hours=2)).isoformat()
+    if await db.live_sessions.find_one({"user_id": user["id"], "status": "launched", "created_at": {"$gt": since}}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="Transfers are paused for 2 hours after you open a live game, so the same credits are not used twice.")
     ident = f"transfer:{user['id']}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("locked_until") and att["locked_until"] > now_iso():
@@ -897,6 +902,7 @@ app.include_router(assistant.router)
 app.include_router(contest.router)
 app.include_router(bulkapi.router)
 app.include_router(live_providers.router)
+app.include_router(infinity.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted(SITE_ORIGINS),
                    allow_methods=["*"], allow_headers=["*"])
 

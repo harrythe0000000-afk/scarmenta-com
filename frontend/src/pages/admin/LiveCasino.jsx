@@ -11,13 +11,12 @@ import { CallbackLogs, LaunchHistory, PlayerReport, RoundHistory } from "@/compo
 import { LiveProviders } from "@/components/LiveProviders";
 import { ImagePicker } from "@/pages/admin/Popups";
 import { useAuth } from "@/context/AuthContext";
-import { api, API, formatApiError } from "@/lib/api";
+import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { fmtDate } from "@/lib/format";
 
 const EMPTY = { name: "", provider: "Evolution", game_uid: "", image_id: null };
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-const CALLBACKS = [`${API}/bulkapi/callback`, `${API}/game_callback.php`];
 
 const run = async (fn, msg, after) => {
   try {
@@ -40,15 +39,15 @@ const StatusCard = ({ data }) => {
       <p className="label-eyebrow mb-2">Connection</p>
       <Check ok={data.token_set && !data.token_is_url} label={data.token_is_url ? "API token looks like a website link, not a token" : "API token saved"} />
       <p className="pl-6 text-xs text-slate-500" data-testid="live-creds-source">Keys in use from: {data.source === "admin panel" ? "Admin panel" : "Server settings"}</p>
-      <Check ok={data.secret_set && data.secret_bytes === 32} label={`Secret key saved (${data.secret_bytes}/32 characters)`} />
+      <Check ok={data.secret_set} label="Client Secret saved" />
       <Check ok={data.inr_rate > 0} label={`INR rate $1 = ₹${data.inr_rate}`} />
       <Check ok={data.rounds > 0} label={`${data.rounds} game rounds received`} />
-      <Check ok={data.reachable} label={data.reachable ? `BULKAPI reachable (${data.launch_url})` : `BULKAPI not reachable (${data.launch_url})`} />
+      <Check ok={data.reachable} label={data.reachable ? `InfinityAPI reachable (${data.launch_url})` : `InfinityAPI not reachable (${data.launch_url})`} />
       <Check ok={data.failed_callbacks === 0} label={`${data.failed_callbacks} failed callbacks`} />
       <Check ok={data.unsettled === 0} label={`${data.unsettled} rounds waiting to settle`} />
       <div className="space-y-2 pt-2">
-        <p className="text-xs text-slate-500">Callback URL to set in the BULKAPI portal (either works)</p>
-        {CALLBACKS.map((u, i) => (
+        <p className="text-xs text-slate-500">Callback URL to save in InfinityAPI → Game Callbacks (keep it private, it contains a secret token)</p>
+        {[data.callback_url].map((u, i) => (
           <div key={u} className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-black/40 px-3 py-2">
             <code className="flex-1 truncate text-xs text-purple-200" data-testid={`live-callback-url-${i}`}>{u}</code>
             <button type="button" onClick={() => { navigator.clipboard.writeText(u); toast.success("Copied"); }} data-testid={`live-callback-copy-${i}`}><Copy className="h-4 w-4 text-slate-400" /></button>
@@ -67,7 +66,7 @@ const CredsCard = ({ data, reload }) => {
     e.preventDefault();
     try {
       const { data: r } = await api.put("/admin/live/credentials", f);
-      toast.success("BULKAPI keys saved");
+      toast.success("InfinityAPI keys saved");
       if (r.warning) toast.warning(r.warning);
       setF({ api_token: "", secret_key: "" });
       reload();
@@ -83,11 +82,10 @@ const CredsCard = ({ data, reload }) => {
   );
   return (
     <form onSubmit={save} className="card-lux space-y-3 p-6" data-testid="live-creds-form">
-      <p className="label-eyebrow">BULKAPI keys</p>
-      <p className="text-xs text-slate-500">Copy these two fields from your BULKAPI portal. One Token + Secret Key opens every game. Leave a box empty to keep the saved value.</p>
-      {field("api_token", "API Token", data.token_mask, "API Token from the portal")}
-      {field("secret_key", "Secret Key", data.secret_mask, "Secret Key (usually 32 characters)")}
-      {f.secret_key && <p className={`text-xs ${f.secret_key.trim().length === 32 ? "text-emerald-300" : "text-amber-300"}`} data-testid="live-creds-secret-length">{f.secret_key.trim().length}/32 characters</p>}
+      <p className="label-eyebrow">InfinityAPI keys</p>
+      <p className="text-xs text-slate-500">Copy the API Key and Client Secret from InfinityAPI → API Tokens (not your panel login). One pair opens every provider. Leave a box empty to keep the saved value.</p>
+      {field("api_token", "API Key", data.token_mask, "API Key from API Tokens")}
+      {field("secret_key", "Client Secret", data.secret_mask, "Client Secret from API Tokens")}
       <label className="flex items-center gap-2 text-xs text-slate-400"><Switch checked={show} onCheckedChange={setShow} data-testid="live-creds-show-toggle" /> Show what I type</label>
       <Button data-testid="live-creds-save" className="w-full rounded-full bg-purple-600 hover:bg-purple-500">Save keys</Button>
       {data.source === "admin panel" && (
@@ -160,8 +158,8 @@ const ServerIpCard = () => {
   const rows = res ? [["Domain", res.domain, "live-whitelist-domain"], ["Server IP", res.ip, "live-whitelist-ip"]] : [];
   return (
     <div className="card-lux space-y-3 p-6" data-testid="live-server-ip-card">
-      <p className="label-eyebrow">Whitelist details for BULKAPI</p>
-      <p className="text-xs text-slate-500">Give BULKAPI this domain and server IP. Check again after every publish, the IP can change.</p>
+      <p className="label-eyebrow">Whitelist details for InfinityAPI</p>
+      <p className="text-xs text-slate-500">Save this server IP in InfinityAPI → IP Whitelist (one IP only, no port). Check again after every publish, the IP can change.</p>
       {rows.map(([l, v, id]) => (
         <div key={id} className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-black/40 px-3 py-2">
           <span className="w-20 text-xs text-slate-500">{l}</span>
@@ -218,7 +216,7 @@ const TestCard = () => {
       </div>
       {res && (
         <div className="space-y-1 rounded-lg border border-purple-500/20 bg-black/40 p-3" data-testid="live-test-result">
-          <Check ok={res.ok} label={res.ok ? "BULKAPI accepted the launch" : `BULKAPI rejected it (status ${res.status})`} />
+          <Check ok={res.ok} label={res.ok ? "InfinityAPI accepted the launch" : `InfinityAPI rejected it (status ${res.status || "no reply"})`} />
           {res.redirect && <p className="truncate text-xs text-slate-400">Opens: {res.redirect}</p>}
           {res.detail && <p className="break-words text-xs text-slate-500">{res.detail}</p>}
         </div>
@@ -242,7 +240,7 @@ const AddGame = ({ onDone, providers }) => {
       <select value={f.provider} onChange={set("provider")} data-testid="live-game-provider-select" className="h-10 w-full rounded-md border border-purple-500/20 bg-black/40 px-3 text-sm text-white">
         {providers.map((p) => <option key={p.id} value={p.name}>{p.name}{p.enabled ? "" : " (off)"}</option>)}
       </select>
-      <Input required placeholder="game_uid from BULKAPI" value={f.game_uid} onChange={set("game_uid")} data-testid="live-game-uid-input" className="border-purple-500/20 bg-black/40 font-mono" />
+      <Input required placeholder="game_uid from InfinityAPI" value={f.game_uid} onChange={set("game_uid")} data-testid="live-game-uid-input" className="border-purple-500/20 bg-black/40 font-mono" />
       <Button data-testid="live-add-game-button" className="w-full rounded-full bg-purple-600 hover:bg-purple-500"><Plus className="mr-2 h-4 w-4" /> Add game</Button>
     </form>
   );
@@ -310,7 +308,7 @@ export default function AdminLiveCasino() {
   const reloadAll = () => { reload(); prov.reload(); };
   return (
     <>
-      <PageHeader eyebrow="BULKAPI" title="Live casino" desc="Manage live dealer games, check the BULKAPI connection and see GGR by provider." />
+      <PageHeader eyebrow="InfinityAPI" title="Live casino" desc="Manage live dealer games, check the InfinityAPI connection and see GGR by provider." />
       <Tabs defaultValue="setup" data-testid="live-tabs">
         <TabsList className="mb-6 flex-wrap bg-black/40">
           <TabsTrigger value="setup" data-testid="live-tab-setup">Setup & games</TabsTrigger>

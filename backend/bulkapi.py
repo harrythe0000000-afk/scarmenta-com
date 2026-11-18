@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import io
@@ -15,8 +16,6 @@ from urllib.parse import urlencode
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
@@ -27,29 +26,35 @@ from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, requ
 
 router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
-_BASE = (os.environ.get("API_BASE_URL") or os.environ["BULKAPI_BASE_URL"]).rstrip("/")
-LAUNCH_URL = _BASE + ("/launch_game/" if "bulkapi.site" in _BASE else "/launch_game")  # .site 301s to the slash path
+INF_BASE = os.environ["INFINITY_BASE_URL"].rstrip("/")
+LAUNCH_URL = INF_BASE + "/api/v1/launch.php"
 DEFAULT_RATE = 95.0
 
 
 _FERNET = Fernet(base64.urlsafe_b64encode(hashlib.sha256(os.environ["JWT_SECRET"].encode()).digest()))
-_CACHE = {"at": 0.0, "token": "", "secret": "", "source": "none"}
+_CACHE = {"at": 0.0, "token": "", "secret": "", "cb_token": "", "source": "none"}
 
 
 async def _ensure() -> None:
     if time.time() - _CACHE["at"] < 30:
         return
-    doc = await db.settings.find_one({"key": "bulkapi_creds"}, {"_id": 0}) or {}
+    doc = await db.settings.find_one({"key": "infinity_creds"}, {"_id": 0}) or {}
+    if not doc.get("cb_enc"):
+        cb = secrets.token_urlsafe(32)
+        await db.settings.update_one({"key": "infinity_creds", "cb_enc": {"$exists": False}},
+                                     {"$set": {"cb_enc": _FERNET.encrypt(cb.encode()).decode()}}, upsert=True)
+        doc = await db.settings.find_one({"key": "infinity_creds"}, {"_id": 0}) or {}
     dec = lambda v: _FERNET.decrypt(v.encode()).decode() if v else ""
     try:
         token, secret = dec(doc.get("token_enc")), dec(doc.get("secret_enc"))
+        _CACHE["cb_token"] = dec(doc.get("cb_enc"))
     except InvalidToken:
         logger.error("Saved BULKAPI keys cannot be decrypted (JWT_SECRET changed?); using server keys")
         token, secret = "", ""
     src = "admin panel" if token or secret else "server"
     _CACHE.update(at=time.time(), source=src,
-                  token=token or (os.environ.get("API_TOKEN") or os.environ.get("BULKAPI_API_TOKEN", "")).strip(),
-                  secret=secret or (os.environ.get("API_SECRET") or os.environ.get("BULKAPI_SECRET_KEY", "")).strip())
+                  token=token or os.environ.get("INFINITY_API_KEY", "").strip(),
+                  secret=secret or os.environ.get("INFINITY_CLIENT_SECRET", "").strip())
 
 
 def _token() -> str:
@@ -64,20 +69,43 @@ def _mask(v: str) -> str:
     return f"••••{v[-4:]}" if len(v) > 4 else ("••••" if v else "")
 
 
-def encrypt_payload(data: dict) -> str:
-    # PHP openssl AES-256-ECB: key null-padded/truncated to 32 bytes, PKCS7 padding, base64 output
-    key = _secret()[:32].ljust(32, b"\0")
-    padder = padding.PKCS7(128).padder()
-    raw = padder.update(json.dumps(data, separators=(",", ":")).encode()) + padder.finalize()
-    enc = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
-    return base64.b64encode(enc.update(raw) + enc.finalize()).decode()
+class LaunchError(Exception):
+    def __init__(self, code: str, status: int = 0, detail: str = ""):
+        super().__init__(code)
+        self.code, self.status, self.detail = code, status, detail
 
 
-def build_launch_url(player: str, wallet: float, game_uid: str) -> str:
-    token, ts = _token(), int(time.time() * 1000)
-    payload = encrypt_payload({"user_id": player, "wallet_amount": wallet, "game_uid": game_uid, "token": token, "timestamp": ts})
-    return LAUNCH_URL + "?" + urlencode({"user_id": player, "wallet_amount": wallet, "game_uid": game_uid,
-                                        "token": token, "timestamp": ts, "payload": payload})
+def member_account(pid: str) -> str:
+    return f"scm_{pid}"
+
+
+async def infinity_launch(member: str, balance_inr: float, game_uid: str, return_url: str) -> dict:
+    await _ensure()
+    if not _token() or not _secret():
+        raise LaunchError("not_configured")
+    bal, ts = f"{balance_inr:.2f}", str(int(time.time()))
+    sig = hmac.new(_secret(), "|".join([_token(), member, game_uid, bal, ts]).encode(), hashlib.sha256).hexdigest()
+    fields = {"api_key": _token(), "user_id": member, "game_uid": game_uid, "balance": bal, "ts": ts, "sig": sig,
+              "currency_code": "INR", "language": "en", "return": return_url, "redirect": "0"}
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20, connect=5), follow_redirects=False) as c:
+            r = await c.post(LAUNCH_URL, data=fields)
+    except httpx.TimeoutException:
+        raise LaunchError("timeout", 0, "InfinityAPI did not answer in time. Do not retry blindly; check launch history.")
+    except httpx.HTTPError as e:
+        raise LaunchError("connection_failed", 0, e.__class__.__name__)
+    try:
+        j = r.json()
+    except ValueError:
+        j = None
+    if not isinstance(j, dict) or j.get("ok") is not True or not (200 <= r.status_code < 300):
+        err = str((j or {}).get("error") or (j or {}).get("message") or "invalid_response")[:120] if isinstance(j, dict) else "invalid_response"
+        logger.warning(f"Infinity launch rejected http={r.status_code} error={err} request_id={(j or {}).get('request_id') if isinstance(j, dict) else None}")
+        raise LaunchError(err, r.status_code, r.text[:300])
+    url = str(j.get("game_url") or "")
+    if not url.startswith("https://"):
+        raise LaunchError("invalid_game_url", r.status_code)
+    return {"game_url": url, "request_id": j.get("request_id")}
 
 
 async def enabled_providers() -> set:
@@ -117,7 +145,7 @@ class GamePatch(BaseModel):
     active: bool
 
 
-FIELDS = {"_id": 0, "id": 1, "name": 1, "provider": 1, "game_uid": 1, "image_id": 1, "active": 1, "created_at": 1}
+FIELDS = {"_id": 0, "id": 1, "name": 1, "provider": 1, "game_uid": 1, "image_id": 1, "image_url": 1, "active": 1, "created_at": 1}
 
 
 @router.get("/live/games")
@@ -224,7 +252,7 @@ async def _fail(user: dict, game: Optional[dict], code: int, reason: str):
 
 
 @router.post("/live/launch")
-async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
+async def launch(body: LaunchIn, request: Request, user: dict = Depends(get_current_user)):
     if user["role"] != "user":
         raise HTTPException(status_code=403, detail="Only players can open live games")
     await _ensure()
@@ -239,12 +267,21 @@ async def launch(body: LaunchIn, user: dict = Depends(get_current_user)):
     balance = float(fresh.get("promo_balance", 0))
     if balance <= 0:
         await _fail(user, game, 400, "Your credit balance is empty. Make a deposit to play.")
+    recent = (datetime.now(timezone.utc) - timedelta(seconds=15)).isoformat()
+    if await db.live_sessions.find_one({"user_id": user["id"], "status": "launched", "created_at": {"$gt": recent}}, {"_id": 1}):
+        raise HTTPException(status_code=429, detail="A game is already opening. Please wait a few seconds.")
     rate = await live_rate()
     pid = await player_id({**user, **fresh})
     wallet = round(balance * rate, 2)
-    url = build_launch_url(pid, wallet, game["game_uid"])
-    await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate)
-    return {"url": url, "wallet_inr": wallet}
+    origin = request.headers.get("origin") or os.environ["FRONTEND_URL"]
+    try:
+        res = await infinity_launch(member_account(pid), wallet, game["game_uid"], origin.rstrip("/") + "/app/live-casino")
+    except LaunchError as e:
+        logger.warning(f"Launch failed for {user['id']} game={game['game_uid']}: {e.code}")
+        await _fail({**user, "bulk_player_id": pid}, game, 502, "This game could not be opened right now. Please try again later.")
+    await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate,
+                      request_id=res["request_id"])
+    return {"url": res["game_url"], "wallet_inr": wallet}
 
 
 # ---------- Callback ----------
@@ -362,16 +399,18 @@ async def set_rate(body: RateIn, admin: dict = Depends(require_admin)):
 async def _reachable() -> bool:
     try:
         async with httpx.AsyncClient(timeout=4, follow_redirects=False) as c:
-            await c.head(LAUNCH_URL)
+            await c.get(INF_BASE + "/api/v1/providers")
         return True
     except httpx.HTTPError:
         return False
 
 
 @router.get("/admin/live/status")
-async def live_status(_: dict = Depends(require_staff)):
+async def live_status(request: Request, _: dict = Depends(require_staff)):
     await _ensure()
-    return {"source": _CACHE["source"], "token_is_url": _token().lower().startswith(("http://", "https://", "www.")),
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(":")[0]
+    return {"callback_url": f"https://{host}/api/infinity/callback?token={_CACHE['cb_token']}",
+            "source": _CACHE["source"], "token_is_url": _token().lower().startswith(("http://", "https://", "www.")),
             "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]),
             "reachable": await _reachable(), "failed_callbacks": await db.live_callbacks.count_documents({"failed": True}),
             "unsettled": await db.live_rounds.count_documents({"settled": False}),
@@ -404,30 +443,12 @@ ERROR_WORDS = ("not found", "missing", "invalid", "error", "expired", "denied", 
 
 
 async def probe(game_uid: str) -> dict:
-    await _ensure()
-    if not _token() or not _secret():
-        return {"ok": False, "status": 0, "redirect": "", "detail": "API token or secret key is missing"}
-    url = build_launch_url("9000000000", 100.0, game_uid.strip())
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20, connect=8), follow_redirects=False) as c:
-            r = await c.get(url)
-    except httpx.TimeoutException:
-        return {"ok": False, "status": 0, "redirect": "", "detail": "BULKAPI did not answer in time"}
-    except httpx.HTTPError as e:
-        return {"ok": False, "status": 0, "redirect": "", "detail": f"Could not reach BULKAPI: {e.__class__.__name__}"}
-    location, text = r.headers.get("location", ""), r.text[:400]
-    low = text.lower()
-    if "application/json" in r.headers.get("content-type", ""):
-        try:
-            j = r.json()
-            low = json.dumps(j).lower()
-            if isinstance(j, dict) and (j.get("status") in (False, 0, "error", "fail", "failed") or j.get("success") is False):
-                low += " error"
-        except ValueError:
-            low += " invalid"
-    ok = (r.is_redirect and bool(location)) or (r.status_code == 200 and not any(w in low for w in ERROR_WORDS))
-    logger.info(f"BULKAPI probe game_uid={game_uid} status={r.status_code} ok={ok}")
-    return {"ok": ok, "status": r.status_code, "redirect": location[:300], "detail": text}
+        res = await infinity_launch("scm_test_9000000000", 100.0, game_uid.strip(), os.environ["FRONTEND_URL"].rstrip("/") + "/app/live-casino")
+    except LaunchError as e:
+        logger.info(f"Infinity probe game_uid={game_uid} failed {e.code}")
+        return {"ok": False, "status": e.status, "redirect": "", "detail": f"{e.code} {e.detail}".strip()[:400]}
+    return {"ok": True, "status": 200, "redirect": res["game_url"][:300], "detail": f"request_id {res['request_id']}"}
 
 
 @router.post("/admin/live/test")
@@ -501,18 +522,17 @@ async def save_credentials(body: CredsIn, admin: dict = Depends(require_admin)):
         upd["token_enc"] = _FERNET.encrypt(token.encode()).decode()
     if secret:
         upd["secret_enc"] = _FERNET.encrypt(secret.encode()).decode()
-    await db.settings.update_one({"key": "bulkapi_creds"}, {"$set": upd}, upsert=True)
+    await db.settings.update_one({"key": "infinity_creds"}, {"$set": upd}, upsert=True)
     await db.audit_logs.insert_one({"id": new_id(), "action": "bulkapi_credentials_updated", "by": admin["email"],
                                     "fields": [k for k, v in (("token", token), ("secret", secret)) if v], "created_at": now_iso()})
     _CACHE["at"] = 0.0
     await _ensure()
-    warn = "" if not secret or len(secret.encode()) == 32 else f"Secret Key has {len(secret.encode())} characters; BULKAPI keys are normally 32."
-    return {"ok": True, "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]), "warning": warn}
+    return {"ok": True, "token_mask": _mask(_token()), "secret_mask": _mask(_CACHE["secret"]), "warning": ""}
 
 
 @router.delete("/admin/live/credentials")
 async def clear_credentials(admin: dict = Depends(require_admin)):
-    await db.settings.delete_one({"key": "bulkapi_creds"})
+    await db.settings.update_one({"key": "infinity_creds"}, {"$unset": {"token_enc": "", "secret_enc": ""}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "bulkapi_credentials_cleared", "by": admin["email"], "created_at": now_iso()})
     _CACHE["at"] = 0.0
     await _ensure()
