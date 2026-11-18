@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Banknote, Clock, LifeBuoy, ShieldAlert, Sparkles, Users, Wallet } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/StatCard";
+import { GgrAlert } from "@/components/GgrAlert";
 import { useFetch } from "@/lib/hooks";
 import { usd } from "@/lib/format";
 
@@ -14,6 +15,7 @@ export default function AdminOverview() {
   return (
     <>
       <PageHeader eyebrow="Admin cockpit" title="Financial overview" desc="Platform-wide cash deposits, credit allocations and outstanding balances." />
+      <GgrAlert />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Cash deposits" value={usd(s?.total_deposits)} icon={Banknote} tone="emerald" testId="admin-stat-deposits" sub={`${s?.approved_count ?? 0} approved`} />
         <StatCard label="Credits issued" value={usd(s?.total_credits)} icon={Sparkles} testId="admin-stat-credits" className="d-1" />

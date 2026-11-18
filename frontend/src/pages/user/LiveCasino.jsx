@@ -11,6 +11,7 @@ import { useFetch } from "@/lib/hooks";
 import { usd } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { LAUNCH_KEY, LiveResultPopup } from "@/components/LiveResultPopup";
+import { BigWinFeed } from "@/components/BigWinFeed";
 
 const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav, tag = "" }) => (
   <div className="relative">
@@ -94,6 +95,7 @@ export default function LiveCasino() {
         <Link to="/app/live-casino/history" data-testid="live-history-link" className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 px-4 py-1.5 text-sm text-purple-200 transition-colors hover:bg-purple-500/10"><History className="h-4 w-4" /> My game history</Link>
       </div>
       <PageHeader eyebrow="Live casino" title="Live dealer games" desc={`Play with your credit balance (${usd(user?.promo_balance || 0)}). Games run in INR; your balance is converted at the current rate and results come back to your Scarmenta balance.`} />
+      <BigWinFeed />
       {data?.length === 0 && <EmptyState text="Live games are coming soon." testId="live-empty" />}
       {data?.length > 0 && (
         <div className="mb-6 space-y-3">

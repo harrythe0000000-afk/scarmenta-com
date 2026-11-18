@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/StatCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallbackLogs, LaunchHistory, PlayerReport, RoundHistory } from "@/components/LiveReports";
 import { LiveProviders } from "@/components/LiveProviders";
+import { GgrAlert } from "@/components/GgrAlert";
 import { ImagePicker } from "@/pages/admin/Popups";
 import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
@@ -311,6 +312,7 @@ export default function AdminLiveCasino() {
   return (
     <>
       <PageHeader eyebrow="InfinityAPI" title="Live casino" desc="Manage live dealer games, check the InfinityAPI connection and see GGR by provider." />
+      <GgrAlert />
       <Tabs defaultValue="setup" data-testid="live-tabs">
         <TabsList className="mb-6 flex-wrap bg-black/40">
           <TabsTrigger value="setup" data-testid="live-tab-setup">Setup & games</TabsTrigger>

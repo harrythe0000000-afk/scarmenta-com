@@ -77,6 +77,13 @@ async def mark_if_broken(game_uid: str, e: "LaunchError") -> bool:
     return True
 
 
+async def note_ggr(e: Optional["LaunchError"]) -> None:
+    if e is None:
+        await db.settings.delete_one({"key": "infinity_ggr_alert"})
+    elif "ggr" in f"{e.code} {e.detail}".lower():
+        await db.settings.update_one({"key": "infinity_ggr_alert"}, {"$set": {"message": e.code[:160], "at": now_iso()}}, upsert=True)
+
+
 class LaunchError(Exception):
     def __init__(self, code: str, status: int = 0, detail: str = ""):
         super().__init__(code)
@@ -289,8 +296,10 @@ async def launch(body: LaunchIn, request: Request, user: dict = Depends(get_curr
     except LaunchError as e:
         logger.warning(f"Launch failed for {user['id']} game={game['game_uid']}: {e.code}")
         await mark_if_broken(game["game_uid"], e)
+        await note_ggr(e)
         await _log_launch({**user, "bulk_player_id": pid}, game, "failed", f"InfinityAPI: {e.code}", wallet_inr=wallet)
         raise HTTPException(status_code=424, detail="This game could not be opened right now. Please try again later.")
+    await note_ggr(None)
     await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate,
                       request_id=res["request_id"])
     return {"url": res["game_url"], "wallet_inr": wallet}
@@ -360,8 +369,10 @@ async def probe(game_uid: str) -> dict:
     except LaunchError as e:
         logger.info(f"Infinity probe game_uid={game_uid} failed {e.code}")
         broken = await mark_if_broken(game_uid.strip(), e)
+        await note_ggr(e)
         return {"ok": False, "status": e.status, "redirect": "", "game_missing": broken,
                 "detail": f"{e.code} {e.detail}".strip()[:400]}
+    await note_ggr(None)
     return {"ok": True, "status": 200, "redirect": res["game_url"][:300], "detail": f"request_id {res['request_id']}"}
 
 

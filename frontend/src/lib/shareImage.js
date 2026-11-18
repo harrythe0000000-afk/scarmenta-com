@@ -243,3 +243,51 @@ export async function renderHedgeImage({ net, othersProfit, creditCost, rounds, 
   wrap(ctx, "Demo practice with free play money. Not real winnings. Real game results are never guaranteed. Credits cannot be withdrawn.", 80, 1220, W - 160, 32);
   return new Promise((res) => c.toBlob(res, "image/png"));
 }
+
+export async function renderLiveWinImage({ net, game, code, link }) {
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#07050d";
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W / 2, 520, 40, W / 2, 520, 720);
+  glow.addColorStop(0, "rgba(251,191,36,0.45)");
+  glow.addColorStop(1, "rgba(251,191,36,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const logo = await loadImg("/scarmenta-logo.png");
+  if (logo) ctx.drawImage(logo, 80, 70, 90, 90);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 52px Georgia, serif";
+  ctx.fillText("Scarmenta", 190, 135);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#F2B94B";
+  ctx.font = "600 30px sans-serif";
+  ctx.fillText("LIVE CASINO WIN", W / 2, 360);
+  ctx.fillStyle = "#fcd34d";
+  ctx.font = "800 150px sans-serif";
+  ctx.fillText(`+${inrFmt(net)}`, W / 2, 560);
+  ctx.fillStyle = "#fff";
+  ctx.font = "600 44px sans-serif";
+  wrap(ctx, game || "Live dealer table", W / 2, 680, W - 200, 56);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(251,191,36,0.12)";
+  ctx.strokeStyle = "rgba(251,191,36,0.5)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(80, 990, W - 160, 210, 28);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "500 30px sans-serif";
+  ctx.fillText("Join with my referral code", 120, 1060);
+  ctx.fillStyle = "#fff";
+  ctx.font = "700 60px monospace";
+  ctx.fillText(code || "—", 120, 1120);
+  ctx.fillStyle = "#fcd34d";
+  ctx.font = "500 24px sans-serif";
+  const shown = link.replace(/^https?:\/\//, "");
+  ctx.fillText(shown.length > 70 ? `…${shown.slice(-67)}` : shown, 120, 1170);
+  return new Promise((res) => c.toBlob(res, "image/png"));
+}

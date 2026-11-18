@@ -15,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 import bulkapi
 from bulkapi import INF_BASE, _ensure, _token, live_rate
-from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, require_admin
+from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, require_admin, require_staff
 from live_providers import ensure_providers
 
 router = APIRouter(prefix="/api")
@@ -231,3 +231,23 @@ async def session_result(since: str, user: dict = Depends(get_current_user)):
     r = rows[0] if rows else {"bet": 0, "win": 0, "usd": 0, "n": 0}
     return {"events": r["n"], "bet_inr": round(r["bet"], 2), "win_inr": round(r["win"], 2), "net_inr": round(r["win"] - r["bet"], 2),
             "net_usd": round(r["usd"], 2)}
+
+
+@router.get("/admin/live/ggr-alert")
+async def ggr_alert(_: dict = Depends(require_staff)):
+    return await db.settings.find_one({"key": "infinity_ggr_alert"}, {"_id": 0, "message": 1, "at": 1}) or {}
+
+
+def _mask(name: str) -> str:
+    name = (name or "Player").strip() or "Player"
+    return f"{name[:2]}***"
+
+
+@router.get("/live/big-wins")
+async def big_wins(_: dict = Depends(get_current_user)):
+    rows = await db.live_rounds.find({"net_inr": {"$gte": 100}}, {"_id": 0, "user_id": 1, "game_name": 1, "provider": 1, "net_inr": 1,
+                                                                 "updated_at": 1}).sort("updated_at", -1).to_list(15)
+    names = {u["id"]: u.get("name") for u in await db.users.find({"id": {"$in": list({r["user_id"] for r in rows})}},
+                                                                   {"_id": 0, "id": 1, "name": 1}).to_list(15)}
+    return [{"player": _mask(names.get(r["user_id"])), "game": r.get("game_name") or r.get("provider"), "net_inr": r["net_inr"],
+             "at": r.get("updated_at")} for r in rows]
