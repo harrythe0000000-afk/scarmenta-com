@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the GGR wallet alert, note_ggr set/clear, the big-win feed, the LiveResultPopup (win, break-even, loss, delayed result, WhatsApp share) and the new providers. Backend: 10/10 pytest pass in tests/test_ggr_bigwins_popup.py. GET /api/admin/live/ggr-alert gives 401 without auth and 403 for a player. For admin and staff it returns {} when there is no alert and {message, at} when one is set. A unit test of note_ggr confirmed: it ignores errors that don't mention ggr, sets the alert when 'ggr' is in the code or detail, and clears it on None. One real probe: with a seeded alert, POST /api/admin/live/providers/{JILI}/test with {game_uid:''} returned ok=true and cleared the alert; JILI stayed enabled. GET /api/live/big-wins needs auth, returns only rounds with net_inr>=100 (a seeded net 50 round was left out), masks names as 'De***', and returns only the fields player/game/net_inr/at. session-result returns the right numbers for win, even and loss, and 400 for a bad 'since'. Frontend (Playwright): the red ggr-alert banner shows on /admin (Overview) and /admin/live-casino. big-win-feed and big-win-0 show 'De*** won ₹1,400 on Lightning Roulette', and the strip is hidden when there are no wins. Win popup: 'You won!' +₹500 with the share button; clicking it downloaded scarmenta-live-win.png, showed the toast 'Image saved — attach it in WhatsApp', and opened api.whatsapp.com with the referral code AE843071 and the /register?ref= link. Break-even popup: title 'Break even', ₹0, live-result-even visible, no share button. Loss popup: 'Not this time' −₹250, no share button. Delayed case: the event was inserted 22.7s after page load, no popup appeared before that, and the popup appeared at 26s, so polling works past 20s. The provider bar lists CG, Evolution Live, Evolution Live (Asia), Ezugi, JILI, PragmaticPlayLive-EU and Spribe (915 games).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/live/providers/{id}/test", "issue": "If a provider test fails because the GGR wallet is empty, the failure has a non-zero status and game_missing=false, so the code sets enabled=False. An admin who tests providers while GGR is empty will turn each of them off, and they need a new successful test to turn them back on. Skip the disable when the error is GGR-related."},
+      {"endpoint": "note_ggr", "issue": "It stores only e.code[:160] as the message. When 'ggr' appears only in the detail, the banner says the generic 'Game provider error'. It would help to store the provider msg from the detail."},
+      {"endpoint": "GET /api/live/big-wins", "issue": "There is no time window, so very old wins stay in the feed forever when activity is low. It also runs a fresh query for every player page load with no caching. Consider a cutoff of about 7 days."},
+      {"endpoint": "GET /api/live/session-result", "issue": "'since' comes from the client clock (new Date() in LiveCasino.jsx). If the device clock is ahead, results are missed. The comparison is also a string compare of 'Z' against '+00:00' ISO formats. A fix is to return the server time from /live/launch and use that as 'at'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Player live casino BigWinFeed", "issues": ["The items are duplicated for the marquee, so with one win the strip shows the same 'De*** won ₹1,400' twice side by side"]},
+      {"screen": "LiveResultPopup break-even", "issues": ["The detail line shows 'Balance change +$0.00'; '$0.00' without the plus sign reads better", "The button says 'Try again' on break-even; 'Keep playing' may fit better"]},
+      {"screen": "LiveResultPopup polling", "issues": ["One failed request during polling (a network blip) ends the loop through .catch, and the launch key is already removed, so the result is lost"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ggr_bigwins_popup.py", "/app/backend/tests/manual_live_popup_seed.py", "/app/backend/tests/manual_ggr_clear_probe.py", "/app/test_reports/pytest/pytest_iter27.xml"],
+  "action_items": [
+    "Optional: do not auto-disable a provider when the test failure is caused by GGR depletion",
+    "Optional: add a time window to big-wins and avoid showing the same win twice when there is only one item",
+    "Optional: retry on errors inside fetchResult instead of stopping"
+  ],
+  "critical_code_review_comments": [
+    "note_ggr is correctly wired in both the player launch (set on error, clear on success) and probe(), and probe() is used by the provider test",
+    "big_wins correctly excludes _id and user_id from the output and masks names server-side",
+    "The popup uses strict equality (net_inr === 0) for break-even; the server rounds to 2 decimals, so float noise cannot cause a false 'loss'"
+  ],
+  "updated_files": ["/app/backend/tests/test_ggr_bigwins_popup.py", "/app/backend/tests/manual_live_popup_seed.py", "/app/backend/tests/manual_ggr_clear_probe.py"],
+  "success_rate": {"backend": "100% (10/10 + 1 manual probe)", "frontend": "100%"},
+  "seed_data_creation": "All seeded docs were removed: the infinity_ggr_alert setting, the TEST-EV-* live_events and the TEST-BW-1/2 live_rounds (all counts verified 0). The single real JILI provider test updated JILI last_test (ok=true) and added one live_provider_tests row; JILI enabled was unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_ggr_bigwins_popup.py -n 0. For popup UI: python tests/manual_live_popup_seed.py event <bet> <win> | bigwin | clean, then set localStorage scarmenta_live_launch {at: ISO a few seconds before}. Inside browser_automation, asyncio.create_subprocess_exec can call the seed script for the delayed case (tool startup takes about 35s, so a bash background sleep is unreliable). Log in via page.request.post('/api/auth/login') to get cookies."
+}
