@@ -7,6 +7,18 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, formatApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { useFetch } from "@/lib/hooks";
+
+const SyncStatus = () => {
+  const { data } = useFetch("/admin/live/sync-runs");
+  const last = data?.[0];
+  return (
+    <p className="text-xs text-slate-500" data-testid="live-sync-status">
+      Daily game refresh runs at 2:00 and 6:00 India time for every imported provider.{" "}
+      {last ? <>Last run {fmtDate(last.finished_at || last.created_at)}: {last.status === "done" ? Object.entries(last.results || {}).map(([n, r]) => r.error ? `${n} failed (${r.error})` : `${n} +${r.added} new, ${r.removed} removed`).join(" · ") : "running…"}</> : "No run yet."}
+    </p>
+  );
+};
 
 const call = async (fn, ok, after) => {
   try {
@@ -128,6 +140,7 @@ export const LiveProviders = ({ providers, canEdit, reload }) => (
       All providers run through the same InfinityAPI account and keys. Import a provider's games from InfinityAPI below. A provider can be turned on for players only after a test launch with one of its games passes. A failed test turns it off.
     </p>
     {canEdit && <CatalogImport onDone={reload} />}
+    {canEdit && <SyncStatus />}
     {canEdit && <AddProvider onDone={reload} />}
     <div className="card-lux overflow-x-auto">
       <Table>

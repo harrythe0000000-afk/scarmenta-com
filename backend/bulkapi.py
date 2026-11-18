@@ -65,6 +65,18 @@ def _mask(v: str) -> str:
     return f"••••{v[-4:]}" if len(v) > 4 else ("••••" if v else "")
 
 
+def game_missing(detail: str) -> bool:
+    return "game not found" in (detail or "").lower()
+
+
+async def mark_if_broken(game_uid: str, e: "LaunchError") -> bool:
+    if not game_missing(e.detail):
+        return False
+    await db.live_games.update_many({"game_uid": game_uid}, {"$set": {"active": False, "broken": True, "broken_at": now_iso()}})
+    logger.warning(f"Game {game_uid} reported as not found by provider; turned off")
+    return True
+
+
 class LaunchError(Exception):
     def __init__(self, code: str, status: int = 0, detail: str = ""):
         super().__init__(code)
@@ -141,7 +153,8 @@ class GamePatch(BaseModel):
     active: bool
 
 
-FIELDS = {"_id": 0, "id": 1, "name": 1, "provider": 1, "game_uid": 1, "image_id": 1, "image_url": 1, "active": 1, "created_at": 1}
+FIELDS = {"_id": 0, "id": 1, "name": 1, "provider": 1, "game_uid": 1, "image_id": 1, "image_url": 1, "active": 1, "broken": 1,
+          "catalog_missing": 1, "created_at": 1}
 
 
 @router.get("/live/games")
@@ -215,7 +228,8 @@ async def add_game(body: GameIn, admin: dict = Depends(require_admin)):
 
 @router.patch("/admin/live/games/{gid}")
 async def toggle_game(gid: str, body: GamePatch, _: dict = Depends(require_admin)):
-    r = await db.live_games.update_one({"id": gid, "deleted": {"$ne": True}}, {"$set": {"active": body.active}})
+    r = await db.live_games.update_one({"id": gid, "deleted": {"$ne": True}},
+                                       {"$set": {"active": body.active, "admin_off": not body.active, "broken": False}})
     if not r.matched_count:
         raise HTTPException(status_code=404, detail="Game not found")
     return {"ok": True}
@@ -274,6 +288,7 @@ async def launch(body: LaunchIn, request: Request, user: dict = Depends(get_curr
         res = await infinity_launch(member_account(pid), wallet, game["game_uid"], origin.rstrip("/") + "/app/live-casino")
     except LaunchError as e:
         logger.warning(f"Launch failed for {user['id']} game={game['game_uid']}: {e.code}")
+        await mark_if_broken(game["game_uid"], e)
         await _log_launch({**user, "bulk_player_id": pid}, game, "failed", f"InfinityAPI: {e.code}", wallet_inr=wallet)
         raise HTTPException(status_code=424, detail="This game could not be opened right now. Please try again later.")
     await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate,
@@ -344,7 +359,9 @@ async def probe(game_uid: str) -> dict:
         res = await infinity_launch("scm_test_9000000000", 100.0, game_uid.strip(), os.environ["FRONTEND_URL"].rstrip("/") + "/app/live-casino")
     except LaunchError as e:
         logger.info(f"Infinity probe game_uid={game_uid} failed {e.code}")
-        return {"ok": False, "status": e.status, "redirect": "", "detail": f"{e.code} {e.detail}".strip()[:400]}
+        broken = await mark_if_broken(game_uid.strip(), e)
+        return {"ok": False, "status": e.status, "redirect": "", "game_missing": broken,
+                "detail": f"{e.code} {e.detail}".strip()[:400]}
     return {"ok": True, "status": 200, "redirect": res["game_url"][:300], "detail": f"request_id {res['request_id']}"}
 
 

@@ -1,0 +1,17 @@
+crons:
+  - name: catalog-sync-6am
+    description: "Refreshes imported InfinityAPI provider games every day at 6am IST"
+    cron: "0 6 * * *"
+    timezone: "Asia/Kolkata"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/catalog-sync"
+    method: POST
+    enabled: true
+  - name: catalog-sync-2am
+    description: "Refreshes imported InfinityAPI provider games every night at 2am IST"
+    cron: "0 2 * * *"
+    timezone: "Asia/Kolkata"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/catalog-sync"
+    method: POST
+    enabled: true

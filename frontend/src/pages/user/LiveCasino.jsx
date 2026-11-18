@@ -9,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { api, formatApiError } from "@/lib/api";
 import { useFetch } from "@/lib/hooks";
 import { usd } from "@/lib/format";
+import { Link } from "react-router-dom";
+import { LAUNCH_KEY, LiveResultPopup } from "@/components/LiveResultPopup";
 
 const GameTile = ({ g, busy, onPlay, rank, rounds, fav, onFav, tag = "" }) => (
   <div className="relative">
@@ -46,7 +48,7 @@ const ProviderBar = ({ providers, value, onChange, favCount }) => (
 );
 
 export default function LiveCasino() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const { data } = useFetch("/live/games");
   const { data: popular } = useFetch("/live/popular");
   const { data: recent } = useFetch("/live/recent");
@@ -69,7 +71,9 @@ export default function LiveCasino() {
   const play = async (g) => {
     setBusy(g.id);
     try {
+      const at = new Date().toISOString();
       const { data: r } = await api.post("/live/launch", { game_id: g.id });
+      localStorage.setItem(LAUNCH_KEY, JSON.stringify({ at, game: g.name }));
       window.location.href = r.url;
     } catch (e) {
       toast.error(formatApiError(e));
@@ -85,6 +89,10 @@ export default function LiveCasino() {
   const groups = shown.reduce((acc, g) => ({ ...acc, [g.provider]: [...(acc[g.provider] || []), g] }), {});
   return (
     <>
+      <LiveResultPopup onDone={refresh} />
+      <div className="mb-2 flex justify-end">
+        <Link to="/app/live-casino/history" data-testid="live-history-link" className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 px-4 py-1.5 text-sm text-purple-200 transition-colors hover:bg-purple-500/10"><History className="h-4 w-4" /> My game history</Link>
+      </div>
       <PageHeader eyebrow="Live casino" title="Live dealer games" desc={`Play with your credit balance (${usd(user?.promo_balance || 0)}). Games run in INR; your balance is converted at the current rate and results come back to your Scarmenta balance.`} />
       {data?.length === 0 && <EmptyState text="Live games are coming soon." testId="live-empty" />}
       {data?.length > 0 && (

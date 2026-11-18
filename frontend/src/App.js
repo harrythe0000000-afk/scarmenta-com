@@ -41,6 +41,7 @@ import UserLeaderboard from "@/pages/user/Leaderboard";
 import UserDemoGame from "@/pages/user/DemoGame";
 import UserContest from "@/pages/user/Contest";
 import UserLiveCasino from "@/pages/user/LiveCasino";
+import UserLiveHistory from "@/pages/user/LiveHistory";
 import AdminLiveCasino from "@/pages/admin/LiveCasino";
 import AdminContest from "@/pages/admin/Contest";
 import AgentDashboard from "@/pages/agent/Dashboard";
@@ -115,6 +116,7 @@ function App() {
             <Route path="demo-game" element={<UserDemoGame />} />
             <Route path="contest" element={<UserContest />} />
             <Route path="live-casino" element={<UserLiveCasino />} />
+            <Route path="live-casino/history" element={<UserLiveHistory />} />
             <Route path="refer" element={<UserRefer />} />
             <Route path="rewards" element={<UserRewards />} />
             <Route path="statement" element={<UserStatement />} />

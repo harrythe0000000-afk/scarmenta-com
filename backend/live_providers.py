@@ -79,8 +79,8 @@ async def test_provider(pid: str, body: ProbeIn, admin: dict = Depends(require_a
         raise HTTPException(status_code=404, detail="Provider not found")
     uid = body.game_uid.strip()
     if not uid:
-        game = await db.live_games.find_one({"provider": prov["name"], "deleted": {"$ne": True}}, {"_id": 0, "game_uid": 1},
-                                            sort=[("active", -1)])
+        game = await db.live_games.find_one({"provider": prov["name"], "deleted": {"$ne": True}, "broken": {"$ne": True}},
+                                            {"_id": 0, "game_uid": 1}, sort=[("active", -1)])
         if not game:
             raise HTTPException(status_code=400, detail="Add at least one game for this provider before testing")
         uid = game["game_uid"]
@@ -88,7 +88,7 @@ async def test_provider(pid: str, body: ProbeIn, admin: dict = Depends(require_a
     test = {"ok": res["ok"], "status": res["status"], "game_uid": uid, "detail": res["detail"][:300],
             "by": admin["email"], "at": now_iso()}
     upd = {"last_test": test}
-    if not res["ok"] and res["status"]:
+    if not res["ok"] and res["status"] and not res.get("game_missing"):
         upd["enabled"] = False
     await db.live_providers.update_one({"id": pid}, {"$set": upd})
     await db.live_provider_tests.insert_one({"id": new_id(), "provider": prov["name"], **test})

@@ -73,6 +73,7 @@ INDEXES: dict[str, list[IndexModel]] = {
                       IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created")],
     "live_providers": [IndexModel([("name", ASCENDING)], name="name", unique=True),
                        IndexModel([("provider_id", ASCENDING)], name="provider_id", unique=True)],
+    "cron_runs": [IndexModel([("run_id", ASCENDING)], name="run_id", unique=True)],
     "live_events": [IndexModel([("event_key", ASCENDING)], name="event_key", unique=True)],
     "live_callbacks": [IndexModel([("created_at", DESCENDING)], name="created_desc"),
                        IndexModel([("failed", ASCENDING)], name="failed")],

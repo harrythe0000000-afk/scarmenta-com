@@ -260,6 +260,8 @@ const Games = ({ games, canEdit, reload }) => (
             <TableCell className="text-right">
               {canEdit && (
                 <div className="flex items-center justify-end gap-2">
+                  {g.broken && <span className="mr-2 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] uppercase text-red-300" data-testid={`live-game-broken-${g.id}`} title="InfinityAPI said this game was not found, so it was turned off">Not found</span>}
+                  {g.catalog_missing && <span className="mr-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] uppercase text-amber-300" title="No longer in the InfinityAPI catalogue">Removed</span>}
                   <Switch checked={g.active} data-testid={`live-game-toggle-${g.id}`} onCheckedChange={(v) => run(() => api.patch(`/admin/live/games/${g.id}`, { active: v }), v ? "Game on" : "Game off", reload)} />
                   <Button size="sm" variant="ghost" data-testid={`live-game-delete-${g.id}`} className="text-slate-500 hover:text-red-300" onClick={() => run(() => api.delete(`/admin/live/games/${g.id}`), "Game removed", reload)}><Trash2 className="h-4 w-4" /></Button>
                 </div>

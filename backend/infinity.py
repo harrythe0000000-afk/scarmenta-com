@@ -3,9 +3,11 @@ import hmac
 import json
 import logging
 import math
+import os
+from datetime import datetime
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
@@ -13,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 import bulkapi
 from bulkapi import INF_BASE, _ensure, _token, live_rate
-from core import client_ip, db, make_tx, new_id, now_iso, require_admin
+from core import client_ip, db, get_current_user, make_tx, new_id, now_iso, require_admin
 from live_providers import ensure_providers
 
 router = APIRouter(prefix="/api")
@@ -136,23 +138,96 @@ class ImportIn(BaseModel):
     name: str = Field(min_length=2, max_length=40)
 
 
-@router.post("/admin/live/catalog/import")
-async def catalog_import(body: ImportIn, admin: dict = Depends(require_admin)):
-    j = await _catalog("/api/v1/games", provider=body.brand_id)
+async def sync_provider(brand_id: str, name: str, by: str) -> dict:
+    j = await _catalog("/api/v1/games", provider=brand_id)
     games = [g for g in j.get("games") or [] if isinstance(g, dict) and str(g.get("game_uid", "")).strip()]
-    await ensure_providers({body.name}, admin["email"])
-    await db.live_providers.update_one({"name": body.name}, {"$set": {"brand_id": body.brand_id}})
+    await ensure_providers({name}, by)
+    await db.live_providers.update_one({"name": name}, {"$set": {"brand_id": brand_id}})
     added = updated = 0
+    seen = set()
     for g in games:
         uid = str(g["game_uid"]).strip()[:80]
-        doc = {"name": str(g.get("name") or uid)[:80], "provider": body.name, "image_url": g.get("img") if str(g.get("img", "")).startswith("https://") else None,
-               "category": g.get("category"), "active": str(g.get("status", "Active")).lower() == "active"}
+        seen.add(uid)
+        doc = {"name": str(g.get("name") or uid)[:80], "provider": name, "category": g.get("category"),
+               "image_url": g.get("img") if str(g.get("img", "")).startswith("https://") else None, "catalog_missing": False}
+        live = str(g.get("status", "Active")).lower() == "active"
         r = await db.live_games.update_one({"game_uid": uid, "deleted": {"$ne": True}}, {"$set": doc})
         if r.matched_count:
+            await db.live_games.update_one({"game_uid": uid, "deleted": {"$ne": True}, "broken": {"$ne": True},
+                                            "admin_off": {"$ne": True}}, {"$set": {"active": live}})
             updated += 1
             continue
-        await db.live_games.insert_one({"id": new_id(), "game_uid": uid, "image_id": None, "deleted": False,
-                                        "created_by": admin["email"], "created_at": now_iso(), **doc})
+        await db.live_games.insert_one({"id": new_id(), "game_uid": uid, "image_id": None, "deleted": False, "active": live,
+                                        "created_by": by, "created_at": now_iso(), **doc})
         added += 1
-    logger.info(f"Catalog import {body.name}: {added} added, {updated} updated")
-    return {"added": added, "updated": updated, "total": len(games)}
+    gone = 0
+    if games:
+        r = await db.live_games.update_many({"provider": name, "deleted": {"$ne": True}, "game_uid": {"$nin": list(seen)}},
+                                            {"$set": {"active": False, "catalog_missing": True}})
+        gone = r.modified_count
+    logger.info(f"Catalog sync {name}: {added} added, {updated} updated, {gone} removed")
+    return {"added": added, "updated": updated, "removed": gone, "total": len(games)}
+
+
+@router.post("/admin/live/catalog/import")
+async def catalog_import(body: ImportIn, admin: dict = Depends(require_admin)):
+    return await sync_provider(body.brand_id, body.name, admin["email"])
+
+
+async def _run_sync(run_id: str) -> None:
+    results = {}
+    for p in await db.live_providers.find({"brand_id": {"$exists": True, "$ne": None}}, {"_id": 0, "name": 1, "brand_id": 1}).to_list(200):
+        try:
+            results[p["name"]] = await sync_provider(p["brand_id"], p["name"], "daily sync")
+        except HTTPException as e:
+            results[p["name"]] = {"error": e.detail}
+        except Exception as e:
+            logger.exception(f"Catalog sync failed for {p['name']}")
+            results[p["name"]] = {"error": e.__class__.__name__}
+    await db.cron_runs.update_one({"run_id": run_id}, {"$set": {"status": "done", "results": results, "finished_at": now_iso()}})
+
+
+@router.post("/cron/catalog-sync")
+async def cron_catalog_sync(request: Request, tasks: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    auth = request.headers.get("authorization", "")
+    secret = os.environ["WEBHOOK_CRON_SECRET"]
+    if not auth.startswith("Bearer ") or not hmac.compare_digest(auth[7:], secret):
+        return JSONResponse({"ok": False}, status_code=401)
+    try:
+        env = json.loads(await request.body() or b"{}")
+    except ValueError:
+        return JSONResponse({"ok": False}, status_code=400)
+    run_id = request.headers.get("x-webhook-id") or (env.get("run_id") if isinstance(env, dict) else None) or new_id()
+    try:
+        await db.cron_runs.insert_one({"run_id": str(run_id)[:100], "job": "catalog-sync", "status": "queued", "created_at": now_iso()})
+    except DuplicateKeyError:
+        return JSONResponse({"ok": True, "duplicate": True})
+    tasks.add_task(_run_sync, str(run_id)[:100])
+    return JSONResponse({"ok": True})
+
+
+@router.get("/admin/live/sync-runs")
+async def sync_runs(_: dict = Depends(require_admin)):
+    return await db.cron_runs.find({"job": "catalog-sync"}, {"_id": 0}).sort("created_at", -1).to_list(10)
+
+
+@router.get("/live/my-rounds")
+async def my_rounds(user: dict = Depends(get_current_user)):
+    return await db.live_rounds.find({"user_id": user["id"]}, {"_id": 0, "game_round": 1, "game_name": 1, "game_uid": 1, "provider": 1,
+                                                               "bet_inr": 1, "win_inr": 1, "net_inr": 1, "applied_usd": 1,
+                                                               "updated_at": 1}).sort("updated_at", -1).to_list(200)
+
+
+@router.get("/live/session-result")
+async def session_result(since: str, user: dict = Depends(get_current_user)):
+    try:
+        datetime.fromisoformat(since.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid time")
+    rows = await db.live_events.aggregate([
+        {"$match": {"user_id": user["id"], "created_at": {"$gte": since}}},
+        {"$group": {"_id": None, "bet": {"$sum": "$bet_inr"}, "win": {"$sum": "$win_inr"}, "usd": {"$sum": "$delta_usd"}, "n": {"$sum": 1}}}]).to_list(1)
+    r = rows[0] if rows else {"bet": 0, "win": 0, "usd": 0, "n": 0}
+    return {"events": r["n"], "bet_inr": round(r["bet"], 2), "win_inr": round(r["win"], 2), "net_inr": round(r["win"] - r["bet"], 2),
+            "net_usd": round(r["usd"], 2)}
