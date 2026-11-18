@@ -1,0 +1,38 @@
+{
+  "summary": "Tested four new features on backend and frontend: the daily catalog-sync cron, auto turn-off of games InfinityAPI reports as not found, the win/loss popup, and the player's 'My game history' page. Backend: 11/11 pytest checks pass in the new file tests/test_catalog_sync_history.py. crons.yml has 2 entries (0 2 * * * and 0 6 * * *, Asia/Kolkata). The cron returns 401 with no auth or a wrong bearer. With the right secret it returns {ok:true} at once, and the run finishes as 'done' with real results (CG 7/7 updated, Evolution Live 237/237). Sending the same X-Webhook-Id again returns duplicate:true. Game 6312 stays broken=true/active=false after the sync. The real InfinityAPI probe of 6312 returns 'game not found' (game_missing=true), and Evolution Live stays enabled after the provider test. When the admin turns 6312 back on, broken is cleared and the game appears for players; it was then restored. session-result returns the right net for a win (+190 INR / +$2.00) and a loss, and returns 400 for a bad 'since'. my-rounds lists rounds without user_id or _id, returns [] for a user with no rounds, and 401 without auth. Frontend checked in Playwright: the win popup shows 'You won!' +₹190 and its detail line; Close works; the localStorage key is removed, so no popup after reload. The loss popup shows 'Not this time' −₹200. The history link, table and back link work; the empty state shows for agentplayer1. The admin 'Not found' badge appears on 6312. The Providers tab shows live-sync-status with the last run's results. Regression: game images load (lazy-loaded), and the provider filter and search work.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/cron/catalog-sync", "issue": "The work runs in an in-process BackgroundTask. If the backend restarts mid-run, or something outside the per-provider try fails (e.g. a DB error), the cron_runs row stays 'queued' forever. The UI then shows 'running…' with no timeout."},
+      {"endpoint": "GET /api/live/session-result", "issue": "The client sends 'since' and it has no lower bound. A stale or edited localStorage value adds up every event since that time. The 'events' count is per callback, not per round, so the popup's 'N results' can overcount when one round sends several callbacks."},
+      {"endpoint": "PATCH /api/admin/live/games/{id}", "issue": "Turning a game OFF also sets broken=false. An admin who turns off a 'Not found' game loses the badge and the reason."},
+      {"endpoint": "GET /api/live/my-rounds", "issue": "Hard limit of 200 with no paging."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Player Live casino 'Most played' card", "issues": ["Grammar: '1 rounds played' should be '1 round played'"]},
+      {"screen": "LiveResultPopup", "issues": ["When net is exactly 0 it shows 'Not this time' with ₹0; a neutral 'Break even' message would fit better", "The popup polls only 4 times × 3s; if callbacks arrive later than about 12s, no popup appears, and the launch key is already removed"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_catalog_sync_history.py", "/app/backend/tests/manual_live_cb_helper.py", "/app/test_reports/pytest/pytest_iter26.xml"],
+  "action_items": [
+    "Optional: mark cron runs that stay queued too long as failed, or show 'stalled' in live-sync-status",
+    "Optional: keep broken=true when the admin turns a game OFF; clear it only when the admin turns it ON",
+    "Optional: limit 'since' in session-result (e.g. at most 6h back) and count distinct game_round",
+    "Fix the '1 rounds played' pluralisation"
+  ],
+  "critical_code_review_comments": [
+    "sync_provider correctly keeps active unchanged for broken or admin_off games; there is no regression risk of re-enabling 6312",
+    "test_provider skips disabling the provider when game_missing is true; this was confirmed against the real API",
+    "Callback idempotency and the ledger are unchanged and still work (live_round tx + promo_balance inc)"
+  ],
+  "updated_files": ["/app/backend/tests/test_catalog_sync_history.py", "/app/backend/tests/manual_live_cb_helper.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
+  "seed_data_creation": "None left behind. All test live_events, live_rounds, live_callbacks and live_round transactions were deleted by id/round. My cron_runs entries and my 2 live_provider_tests entries were deleted. demo promo_balance was restored to 1039. 6312 was restored to broken=true/active=false with no admin_off. Main agent's cron_runs 'test-run-1' was kept. Evolution Live last_test was already 'Failed (game not found)' from the main agent's earlier probe; it was re-set by my identical probe.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_catalog_sync_history.py -n 0. It cleans up after itself. To drive the popup UI: python tests/manual_live_cb_helper.py send <round> <bet> <win>, then set localStorage scarmenta_live_launch {at: recent ISO}. Clean up with: python tests/manual_live_cb_helper.py clean <rounds...>. The player /api/live/games omits game_uid, so use the game id. Use '-n 0', not '-p no:xdist'."
+}
