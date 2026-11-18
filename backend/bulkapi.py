@@ -80,8 +80,11 @@ async def mark_if_broken(game_uid: str, e: "LaunchError") -> bool:
 async def note_ggr(e: Optional["LaunchError"]) -> None:
     if e is None:
         await db.settings.delete_one({"key": "infinity_ggr_alert"})
-    elif "ggr" in f"{e.code} {e.detail}".lower():
-        await db.settings.update_one({"key": "infinity_ggr_alert"}, {"$set": {"message": e.code[:160], "at": now_iso()}}, upsert=True)
+    elif "ggr" in f"{e.code} {e.detail}".lower() or e.code == "IP_NOT_WHITELISTED":
+        ip = re.search(r"\d{1,3}(?:\.\d{1,3}){3}", e.detail)
+        await db.settings.update_one({"key": "infinity_ggr_alert"}, {"$set": {
+            "message": e.code[:160], "kind": "ip" if e.code == "IP_NOT_WHITELISTED" else "ggr",
+            "ip": ip.group(0) if ip else None, "at": now_iso()}}, upsert=True)
 
 
 class LaunchError(Exception):
@@ -297,7 +300,7 @@ async def launch(body: LaunchIn, request: Request, user: dict = Depends(get_curr
         logger.warning(f"Launch failed for {user['id']} game={game['game_uid']}: {e.code}")
         await mark_if_broken(game["game_uid"], e)
         await note_ggr(e)
-        await _log_launch({**user, "bulk_player_id": pid}, game, "failed", f"InfinityAPI: {e.code}", wallet_inr=wallet)
+        await _log_launch({**user, "bulk_player_id": pid}, game, "failed", f"InfinityAPI: {e.code} {e.detail}".strip()[:300], wallet_inr=wallet)
         raise HTTPException(status_code=424, detail="This game could not be opened right now. Please try again later.")
     await note_ggr(None)
     await _log_launch({**user, "bulk_player_id": pid}, game, "launched", wallet_inr=wallet, wallet_usd=round(balance, 2), rate=rate,

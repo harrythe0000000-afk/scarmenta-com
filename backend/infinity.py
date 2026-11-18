@@ -290,7 +290,7 @@ async def session_result(since: str, user: dict = Depends(get_current_user)):
 
 @router.get("/admin/live/ggr-alert")
 async def ggr_alert(_: dict = Depends(require_staff)):
-    return await db.settings.find_one({"key": "infinity_ggr_alert"}, {"_id": 0, "message": 1, "at": 1}) or {}
+    return await db.settings.find_one({"key": "infinity_ggr_alert"}, {"_id": 0, "message": 1, "at": 1, "kind": 1, "ip": 1}) or {}
 
 
 def _mask(name: str) -> str:

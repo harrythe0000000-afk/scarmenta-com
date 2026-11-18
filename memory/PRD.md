@@ -205,3 +205,4 @@ Deposit D → fee = D × fee% (default 20) → real wallet += D − fee; promo w
 - session-result returns top_round_inr; LiveResultPopup shows MEGA WIN (crown, confetti, gold glow) when one round net >= ₹10,000
 - LiveResultPopup polling now survives network errors (try/catch per attempt)
 - Tested by main agent (curl + screenshot); testing agent not run for this batch
+- 2026-11-18: Prod launches blocked by InfinityAPI 403 IP_NOT_WHITELISTED (after GGR recharge fixed the depleted error). Outbound IP of Emergent hosting is not fixed (preview changed 34.170.12.145 -> 35.225.230.28). Admin alert now also covers IP block and shows the exact blocked IP (settings infinity_ggr_alert kind=ip, ip); launch history stores full InfinityAPI message; provider test no longer disables provider on IP block. Needs user to whitelist the shown IP / ask InfinityAPI for multiple IPs or disable IP lock.

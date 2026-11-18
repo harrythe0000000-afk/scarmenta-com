@@ -88,7 +88,7 @@ async def test_provider(pid: str, body: ProbeIn, admin: dict = Depends(require_a
     test = {"ok": res["ok"], "status": res["status"], "game_uid": uid, "detail": res["detail"][:300],
             "by": admin["email"], "at": now_iso()}
     upd = {"last_test": test}
-    if not res["ok"] and res["status"] and not res.get("game_missing") and "ggr" not in res["detail"].lower():
+    if not res["ok"] and res["status"] and not res.get("game_missing") and "ggr" not in res["detail"].lower() and "IP_NOT_WHITELISTED" not in res["detail"]:
         upd["enabled"] = False
     await db.live_providers.update_one({"id": pid}, {"$set": upd})
     await db.live_provider_tests.insert_one({"id": new_id(), "provider": prov["name"], **test})
